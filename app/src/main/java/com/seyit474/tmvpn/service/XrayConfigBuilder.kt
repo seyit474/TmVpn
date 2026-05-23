@@ -1,34 +1,27 @@
 package com.seyit474.tmvpn.service
 
+import com.seyit474.tmvpn.model.AppSettings
 import com.seyit474.tmvpn.model.ServerConfig
 import org.json.JSONArray
 import org.json.JSONObject
 
-/**
- * ServerConfig'i Xray-core'un anlayacağı JSON yapısına çevirir.
- *
- * SOCKS inbound 10808 + DNS inbound 10853 + outbound (vless/vmess/ss).
- * VpnService tarafından açılan tun arayüzü, tun2socks ile bu SOCKS portuna
- * yönlendirilir. Böylece tüm cihaz trafiği Xray üzerinden geçer.
- */
 object XrayConfigBuilder {
 
     private const val SOCKS_PORT = 10808
-    private const val DNS_PORT = 10853
+    private const val DNS_PORT   = 10853
 
-    fun build(cfg: ServerConfig): String {
-        val root = JSONObject().apply {
-            put("log", JSONObject().put("loglevel", "warning"))
-            put("inbounds", inbounds())
-            put("outbounds", outbounds(cfg))
-            put("routing", routing())
-            put("dns", dns())
-        }
-        return root.toString(2)
-    }
+    fun build(cfg: ServerConfig, settings: AppSettings = AppSettings()): String =
+        JSONObject().apply {
+            put("log",       JSONObject().put("loglevel", "warning"))
+            put("inbounds",  inbounds())
+            put("outbounds", outbounds(cfg, settings))
+            put("routing",   routing(settings))
+            put("dns",       dns())
+        }.toString(2)
+
+    // ─── inbounds ────────────────────────────────────────────────────────────
 
     private fun inbounds(): JSONArray = JSONArray().apply {
-        // SOCKS — tun2socks bağlanacak
         put(JSONObject().apply {
             put("tag", "socks-in")
             put("port", SOCKS_PORT)
@@ -40,12 +33,9 @@ object XrayConfigBuilder {
             })
             put("sniffing", JSONObject().apply {
                 put("enabled", true)
-                put("destOverride", JSONArray().apply {
-                    put("http"); put("tls"); put("quic")
-                })
+                put("destOverride", JSONArray().apply { put("http"); put("tls"); put("quic") })
             })
         })
-        // DNS in
         put(JSONObject().apply {
             put("tag", "dns-in")
             put("port", DNS_PORT)
@@ -59,21 +49,22 @@ object XrayConfigBuilder {
         })
     }
 
-    private fun outbounds(cfg: ServerConfig): JSONArray = JSONArray().apply {
-        put(proxyOutbound(cfg))
+    // ─── outbounds ───────────────────────────────────────────────────────────
+
+    private fun outbounds(cfg: ServerConfig, settings: AppSettings): JSONArray = JSONArray().apply {
+        put(proxyOutbound(cfg, settings))
         put(JSONObject().apply { put("tag", "direct"); put("protocol", "freedom") })
-        put(JSONObject().apply { put("tag", "block"); put("protocol", "blackhole") })
+        put(JSONObject().apply { put("tag", "block");  put("protocol", "blackhole") })
     }
 
-    private fun proxyOutbound(cfg: ServerConfig): JSONObject {
-        return when (cfg.protocol) {
-            ServerConfig.Protocol.VLESS -> vlessOutbound(cfg)
-            ServerConfig.Protocol.VMESS -> vmessOutbound(cfg)
+    private fun proxyOutbound(cfg: ServerConfig, settings: AppSettings): JSONObject =
+        when (cfg.protocol) {
+            ServerConfig.Protocol.VLESS       -> vlessOutbound(cfg, settings)
+            ServerConfig.Protocol.VMESS       -> vmessOutbound(cfg, settings)
             ServerConfig.Protocol.SHADOWSOCKS -> ssOutbound(cfg)
         }
-    }
 
-    private fun vlessOutbound(cfg: ServerConfig) = JSONObject().apply {
+    private fun vlessOutbound(cfg: ServerConfig, settings: AppSettings) = JSONObject().apply {
         put("tag", "proxy")
         put("protocol", "vless")
         put("settings", JSONObject().apply {
@@ -87,10 +78,13 @@ object XrayConfigBuilder {
                 }))
             }))
         })
-        put("streamSettings", streamSettings(cfg))
+        put("streamSettings", streamSettings(cfg, settings))
+        if (settings.muxEnabled && cfg.flow.isNullOrEmpty()) {
+            put("mux", muxObject(settings))
+        }
     }
 
-    private fun vmessOutbound(cfg: ServerConfig) = JSONObject().apply {
+    private fun vmessOutbound(cfg: ServerConfig, settings: AppSettings) = JSONObject().apply {
         put("tag", "proxy")
         put("protocol", "vmess")
         put("settings", JSONObject().apply {
@@ -104,7 +98,8 @@ object XrayConfigBuilder {
                 }))
             }))
         })
-        put("streamSettings", streamSettings(cfg))
+        put("streamSettings", streamSettings(cfg, settings))
+        if (settings.muxEnabled) put("mux", muxObject(settings))
     }
 
     private fun ssOutbound(cfg: ServerConfig) = JSONObject().apply {
@@ -120,7 +115,9 @@ object XrayConfigBuilder {
         })
     }
 
-    private fun streamSettings(cfg: ServerConfig) = JSONObject().apply {
+    // ─── stream settings (TLS / REALITY / WS / gRPC) + fragment ─────────────
+
+    private fun streamSettings(cfg: ServerConfig, settings: AppSettings) = JSONObject().apply {
         put("network", cfg.network)
         put("security", cfg.security)
 
@@ -142,7 +139,7 @@ object XrayConfigBuilder {
         }
 
         when (cfg.network) {
-            "ws" -> put("wsSettings", JSONObject().apply {
+            "ws"   -> put("wsSettings", JSONObject().apply {
                 cfg.path?.let { put("path", it) }
                 cfg.host?.let { put("headers", JSONObject().put("Host", it)) }
             })
@@ -150,36 +147,71 @@ object XrayConfigBuilder {
                 cfg.path?.let { put("serviceName", it) }
             })
         }
+
+        // Fragment — DPI atlatma (Türkmenistan için tlshello)
+        if (settings.fragmentEnabled) {
+            put("sockopt", JSONObject().apply {
+                put("fragment", JSONObject().apply {
+                    put("packets",  settings.fragmentPackets)
+                    put("length",   settings.fragmentLength)
+                    put("interval", settings.fragmentInterval)
+                })
+            })
+        }
     }
 
-    private fun routing(): JSONObject = JSONObject().apply {
+    // ─── mux ─────────────────────────────────────────────────────────────────
+
+    private fun muxObject(settings: AppSettings) = JSONObject().apply {
+        put("enabled",          true)
+        put("concurrency",      8)
+        put("xudpConcurrency",  8)
+        put("xudpProxyUDP443",  settings.quicMux)  // "reject" | "disable"
+    }
+
+    // ─── routing ─────────────────────────────────────────────────────────────
+
+    private fun routing(settings: AppSettings): JSONObject = JSONObject().apply {
         put("domainStrategy", "IPIfNonMatch")
         put("rules", JSONArray().apply {
-            // DNS trafiğini DNS outbound'a yönlendir (yoksa döngü olur)
-            put(JSONObject().apply {
-                put("type", "field")
-                put("inboundTag", JSONArray().put("dns-in"))
-                put("outboundTag", "proxy")
-            })
-            // private IP'leri direct
-            put(JSONObject().apply {
-                put("type", "field")
-                put("ip", JSONArray().put("geoip:private"))
-                put("outboundTag", "direct")
-            })
-            // reklam / kötü amaçlı engelle
-            put(JSONObject().apply {
-                put("type", "field")
-                put("domain", JSONArray().put("geosite:category-ads-all"))
-                put("outboundTag", "block")
-            })
+            // DNS trafiğini proxy'ye yönlendir (döngü önleme)
+            put(rule(inboundTag = "dns-in", outboundTag = "proxy"))
+            // Private IP'ler doğrudan
+            put(rule(ip = "geoip:private", outboundTag = "direct"))
+            // Reklam engelle
+            put(rule(domain = "geosite:category-ads-all", outboundTag = "block"))
+            // UDP 443 engelle (QUIC → TikTok vs TCP'ye düşsün)
+            if (settings.blockUdp443) {
+                put(JSONObject().apply {
+                    put("type", "field")
+                    put("network", "udp")
+                    put("port", 443)
+                    put("outboundTag", "block")
+                })
+            }
+            // Google → proxy (Türkmenistan'da erişim için)
+            if (settings.forceGoogleProxy) {
+                put(rule(domain = "geosite:google", outboundTag = "proxy"))
+            }
         })
     }
 
+    private fun rule(
+        inboundTag: String? = null,
+        ip: String? = null,
+        domain: String? = null,
+        outboundTag: String,
+    ) = JSONObject().apply {
+        put("type", "field")
+        inboundTag?.let { put("inboundTag", JSONArray().put(it)) }
+        ip?.let         { put("ip",         JSONArray().put(it)) }
+        domain?.let     { put("domain",     JSONArray().put(it)) }
+        put("outboundTag", outboundTag)
+    }
+
+    // ─── dns ─────────────────────────────────────────────────────────────────
+
     private fun dns(): JSONObject = JSONObject().apply {
-        put("servers", JSONArray().apply {
-            put("1.1.1.1")
-            put("8.8.8.8")
-        })
+        put("servers", JSONArray().apply { put("1.1.1.1"); put("8.8.8.8") })
     }
 }

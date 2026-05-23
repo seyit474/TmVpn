@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.seyit474.tmvpn.model.AppSettings
 import com.seyit474.tmvpn.model.ServerConfig
 import com.seyit474.tmvpn.ping.ServerPinger
 import com.seyit474.tmvpn.ui.theme.*
@@ -49,12 +50,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             TmVpnTheme {
-                HomeScreen(
+                AppRoot(
                     vm          = vm,
                     onConnect   = { requestVpnPermission() },
-                    onDisconnect = {
-                        vm.disconnectVpn(this)
-                    },
+                    onDisconnect = { vm.disconnectVpn(this) },
                 )
             }
         }
@@ -68,161 +67,562 @@ class MainActivity : ComponentActivity() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Root screen
+// Root — 3-tab navigation
 // ─────────────────────────────────────────────────────────────────────────────
 
-@Composable
-fun HomeScreen(
-    vm: VpnViewModel,
-    onConnect: () -> Unit,
-    onDisconnect: () -> Unit,
-) {
-    val state by vm.state.collectAsStateWithLifecycle()
+private enum class AppTab { HOME, SERVERS, SETTINGS }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(ColorBackground)
-    ) {
-        // Subtle ambient top glow
+@Composable
+fun AppRoot(vm: VpnViewModel, onConnect: () -> Unit, onDisconnect: () -> Unit) {
+    val state    by vm.state.collectAsStateWithLifecycle()
+    val traffic  by vm.traffic.collectAsStateWithLifecycle()
+    val settings by vm.settings.collectAsStateWithLifecycle()
+
+    var currentTab by remember { mutableStateOf(AppTab.HOME) }
+
+    Scaffold(
+        containerColor = ColorBackground,
+        bottomBar = {
+            PremiumBottomBar(
+                current  = currentTab,
+                onSelect = { currentTab = it },
+            )
+        },
+    ) { padding ->
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(320.dp)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(ColorBlue.copy(alpha = 0.04f), Color.Transparent)
-                    )
-                )
-        )
-
-        Column(
-            modifier = Modifier
                 .fillMaxSize()
-                .systemBarsPadding(),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .padding(padding)
+                .background(ColorBackground),
         ) {
-            TopBar()
-
-            Spacer(Modifier.height(16.dp))
-
-            StatusBadge(state)
-
-            Spacer(Modifier.height(32.dp))
-
-            ConnectOrb(
-                state = state,
-                onClick = {
-                    when (state) {
-                        is VpnViewModel.UiState.Connected -> onDisconnect()
-                        is VpnViewModel.UiState.Ready    -> onConnect()
-                        else                              -> Unit
-                    }
-                },
-            )
-
-            Spacer(Modifier.height(28.dp))
-
-            // Dynamic lower panel
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.TopCenter,
-            ) {
-                when (val s = state) {
-                    is VpnViewModel.UiState.Ready -> ServerPanel(
-                        results    = s.results,
-                        selectedId = s.selected.id,
-                        onSelect   = vm::selectServer,
-                    )
-                    is VpnViewModel.UiState.Connected -> ConnectedPanel(s.server)
-                    is VpnViewModel.UiState.Loading   -> StatusPanel("Sunucular alınıyor…")
-                    is VpnViewModel.UiState.Testing   -> StatusPanel("Hızlar ölçülüyor…")
-                    is VpnViewModel.UiState.Error     -> ErrorPanel(s.message, vm::refreshAndPickFastest)
-                    else                              -> Unit
-                }
+            when (currentTab) {
+                AppTab.HOME    -> HomeTab(state, traffic, onConnect, onDisconnect)
+                AppTab.SERVERS -> ServersTab(state, vm)
+                AppTab.SETTINGS -> SettingsTab(settings, vm::updateSettings)
             }
         }
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Top bar
+// Bottom bar
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun TopBar() {
+private fun PremiumBottomBar(current: AppTab, onSelect: (AppTab) -> Unit) {
+    NavigationBar(
+        containerColor = ColorSurface,
+        tonalElevation = 0.dp,
+        modifier = Modifier.border(
+            width = 0.5.dp,
+            color = ColorCardStroke,
+            shape = RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp),
+        ),
+    ) {
+        listOf(
+            Triple(AppTab.HOME,     Icons.Rounded.Home,     "Ana Sayfa"),
+            Triple(AppTab.SERVERS,  Icons.Rounded.Dns,      "Sunucular"),
+            Triple(AppTab.SETTINGS, Icons.Rounded.Settings, "Ayarlar"),
+        ).forEach { (tab, icon, label) ->
+            NavigationBarItem(
+                selected      = current == tab,
+                onClick       = { onSelect(tab) },
+                icon          = {
+                    Icon(icon, contentDescription = label, modifier = Modifier.size(22.dp))
+                },
+                label         = { Text(label, fontSize = 11.sp) },
+                colors        = NavigationBarItemDefaults.colors(
+                    selectedIconColor      = ColorBlue,
+                    selectedTextColor      = ColorBlue,
+                    indicatorColor         = ColorBlue.copy(alpha = 0.12f),
+                    unselectedIconColor    = ColorTextSecondary,
+                    unselectedTextColor    = ColorTextSecondary,
+                ),
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HOME TAB
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun HomeTab(
+    state: VpnViewModel.UiState,
+    traffic: VpnViewModel.Traffic,
+    onConnect: () -> Unit,
+    onDisconnect: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .systemBarsPadding(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        // Top bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.Security, null, tint = ColorBlue, modifier = Modifier.size(24.dp))
+                Spacer(Modifier.width(8.dp))
+                Column {
+                    Text("TmVPN", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = ColorTextPrimary)
+                    val subText = when (state) {
+                        is VpnViewModel.UiState.Connected -> "Bağlı"
+                        else                              -> "Bağlı değil"
+                    }
+                    Text(subText, fontSize = 12.sp, color = ColorTextSecondary)
+                }
+            }
+            // Status badge
+            val (badgeLabel, badgeColor) = when (state) {
+                is VpnViewModel.UiState.Connected -> "Aktif" to ColorGreen
+                is VpnViewModel.UiState.Connecting -> "Bağlanıyor" to ColorAmber
+                else -> "Pasif" to ColorTextSecondary
+            }
+            val badgeAnim by animateColorAsState(badgeColor, tween(400), label = "badge")
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(badgeAnim.copy(0.12f))
+                    .border(1.dp, badgeAnim.copy(0.30f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(badgeAnim),
+                )
+                Spacer(Modifier.width(5.dp))
+                Text(badgeLabel, color = badgeAnim, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Connect orb
+        ConnectOrb(
+            state = state,
+            onClick = {
+                when (state) {
+                    is VpnViewModel.UiState.Connected -> onDisconnect()
+                    is VpnViewModel.UiState.Ready     -> onConnect()
+                    else                              -> Unit
+                }
+            },
+        )
+
+        Spacer(Modifier.height(24.dp))
+
+        // Traffic stats card (connected only) or loading indicator
+        when (state) {
+            is VpnViewModel.UiState.Connected  -> {
+                TrafficCard(traffic)
+                Spacer(Modifier.height(12.dp))
+                ActiveServerCard(state.server)
+            }
+            is VpnViewModel.UiState.Loading    -> StatusPanel("Sunucular alınıyor…")
+            is VpnViewModel.UiState.Testing    -> StatusPanel("Hızlar ölçülüyor…")
+            is VpnViewModel.UiState.Error      -> ErrorPanel(state.message, onRetry = {})
+            else                               -> Unit
+        }
+    }
+}
+
+// ─── traffic card ────────────────────────────────────────────────────────────
+
+@Composable
+private fun TrafficCard(t: VpnViewModel.Traffic) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        shape  = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = ColorCard),
+        border = BorderStroke(0.5.dp, ColorCardStroke),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp, horizontal = 20.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            // Time
+            TrafficStat(
+                icon   = Icons.Rounded.Schedule,
+                iconTint = ColorBlue,
+                top    = formatTime(t.elapsedSeconds),
+                bottom = "",
+            )
+            // Download
+            TrafficStat(
+                icon   = Icons.Rounded.ArrowDownward,
+                iconTint = ColorGreen,
+                top    = formatSpeed(t.downloadBytesPerSec),
+                bottom = "Toplam ↓ ${formatBytes(t.totalDownloadBytes)}",
+            )
+            // Upload
+            TrafficStat(
+                icon   = Icons.Rounded.ArrowUpward,
+                iconTint = ColorAmber,
+                top    = formatSpeed(t.uploadBytesPerSec),
+                bottom = "Toplam ↑ ${formatBytes(t.totalUploadBytes)}",
+            )
+        }
+    }
+}
+
+@Composable
+private fun TrafficStat(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconTint: Color,
+    top: String,
+    bottom: String,
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(icon, null, tint = iconTint, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.height(4.dp))
+        Text(top, color = ColorTextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        if (bottom.isNotEmpty()) {
+            Text(bottom, color = ColorTextSecondary, fontSize = 10.sp)
+        }
+    }
+}
+
+// ─── active server card ──────────────────────────────────────────────────────
+
+@Composable
+private fun ActiveServerCard(server: ServerConfig) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        shape  = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = ColorCard),
+        border = BorderStroke(0.5.dp, ColorGreen.copy(0.25f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(ColorBlue.copy(0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Rounded.Language, null, tint = ColorBlue, modifier = Modifier.size(20.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Aktif Sunucu", color = ColorTextSecondary, fontSize = 11.sp)
+                Text(server.remark, color = ColorTextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "${server.protocol.name} • ${server.network.uppercase()}",
+                    color = ColorTextSecondary, fontSize = 12.sp,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(ColorGreen),
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SERVERS TAB
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun ServersTab(state: VpnViewModel.UiState, vm: VpnViewModel) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .systemBarsPadding()
+            .padding(horizontal = 16.dp),
+    ) {
+        Spacer(Modifier.height(16.dp))
+        Text("Sunucular", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = ColorTextPrimary)
+        Spacer(Modifier.height(16.dp))
+
+        // Yenile / Test Et buttons
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            val isConnected = state is VpnViewModel.UiState.Connected
+            OutlinedButton(
+                onClick  = { if (!isConnected) vm.refreshAndPickFastest() },
+                enabled  = !isConnected,
+                modifier = Modifier.weight(1f),
+                border   = BorderStroke(1.dp, ColorCardStroke),
+                colors   = ButtonDefaults.outlinedButtonColors(contentColor = ColorTextSecondary),
+                shape    = RoundedCornerShape(10.dp),
+            ) {
+                Icon(Icons.Rounded.Refresh, null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Yenile")
+            }
+            OutlinedButton(
+                onClick  = { if (!isConnected) vm.refreshAndPickFastest() },
+                enabled  = !isConnected,
+                modifier = Modifier.weight(1f),
+                border   = BorderStroke(1.dp, ColorCardStroke),
+                colors   = ButtonDefaults.outlinedButtonColors(contentColor = ColorTextSecondary),
+                shape    = RoundedCornerShape(10.dp),
+            ) {
+                Icon(Icons.Rounded.Speed, null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Test Et")
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        when (state) {
+            is VpnViewModel.UiState.Connected -> {
+                Card(
+                    shape  = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = ColorAmber.copy(0.08f)),
+                    border = BorderStroke(1.dp, ColorAmber.copy(0.25f)),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Rounded.Info, null, tint = ColorAmber, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Bağlı durumda — değiştirmek için kes",
+                            color = ColorAmber, fontSize = 13.sp,
+                        )
+                    }
+                }
+            }
+            is VpnViewModel.UiState.Ready -> {
+                ServerPanel(
+                    results    = state.results,
+                    selectedId = state.selected.id,
+                    onSelect   = vm::selectServer,
+                )
+            }
+            is VpnViewModel.UiState.Loading -> StatusPanel("Sunucular alınıyor…")
+            is VpnViewModel.UiState.Testing -> StatusPanel("Hızlar test ediliyor…")
+            is VpnViewModel.UiState.Error   -> ErrorPanel(state.message, vm::refreshAndPickFastest)
+            else                            -> Unit
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SETTINGS TAB
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun SettingsTab(
+    settings: AppSettings,
+    update: AppSettings.(AppSettings.() -> AppSettings) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .systemBarsPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp),
+    ) {
+        Spacer(Modifier.height(16.dp))
+        Text("Ayarlar", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = ColorTextPrimary)
+        Spacer(Modifier.height(20.dp))
+
+        // ── Fragment (DPI atlatma) ────────────────────────────────────────────
+        SettingsSection(title = "FRAGMENT (DPI ATLATMA)") {
+            SettingsToggle(
+                icon    = Icons.Rounded.Shield,
+                label   = "Fragment Aktif",
+                sublabel = "Türkmenistan için tlshello/1-3/1-1",
+                checked = settings.fragmentEnabled,
+                onChange = { update { copy(fragmentEnabled = it) } },
+            )
+            if (settings.fragmentEnabled) {
+                SettingsDropdown(
+                    icon    = Icons.Rounded.Code,
+                    label   = "Packets",
+                    value   = settings.fragmentPackets,
+                    options = listOf("tlshello", "1-3", "1-5", "all"),
+                    onChange = { update { copy(fragmentPackets = it) } },
+                )
+                SettingsDropdown(
+                    icon    = Icons.Rounded.LinearScale,
+                    label   = "Length",
+                    value   = settings.fragmentLength,
+                    options = listOf("1-3", "1-5", "10-30", "100-200"),
+                    onChange = { update { copy(fragmentLength = it) } },
+                )
+                SettingsDropdown(
+                    icon    = Icons.Rounded.Timer,
+                    label   = "Interval",
+                    value   = settings.fragmentInterval,
+                    options = listOf("1-1", "1-3", "1-5"),
+                    onChange = { update { copy(fragmentInterval = it) } },
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // ── MUX ──────────────────────────────────────────────────────────────
+        SettingsSection(title = "MUX") {
+            SettingsToggle(
+                icon    = Icons.Rounded.CallSplit,
+                label   = "Mux Aktif",
+                sublabel = "TCP/UDP çoğullama",
+                checked = settings.muxEnabled,
+                onChange = { update { copy(muxEnabled = it) } },
+            )
+            if (settings.muxEnabled) {
+                SettingsDropdown(
+                    icon    = Icons.Rounded.Tag,
+                    label   = "QUIC Mux",
+                    value   = settings.quicMux,
+                    options = listOf("reject", "disable"),
+                    onChange = { update { copy(quicMux = it) } },
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // ── Routing ───────────────────────────────────────────────────────────
+        SettingsSection(title = "ROUTING") {
+            SettingsToggle(
+                icon    = Icons.Rounded.Block,
+                label   = "UDP 443 Bloklama",
+                sublabel = "QUIC engelleme (TikTok TCP'ye düşsün)",
+                checked = settings.blockUdp443,
+                onChange = { update { copy(blockUdp443 = it) } },
+            )
+            SettingsToggle(
+                icon    = Icons.Rounded.Search,
+                label   = "Google Proxy Zorla",
+                sublabel = "geosite:google → proxy",
+                checked = settings.forceGoogleProxy,
+                onChange = { update { copy(forceGoogleProxy = it) } },
+            )
+        }
+
+        Spacer(Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Text(
+        title,
+        color         = ColorTextSecondary,
+        fontSize      = 11.sp,
+        fontWeight    = FontWeight.SemiBold,
+        letterSpacing = 1.sp,
+        modifier      = Modifier.padding(start = 4.dp, bottom = 8.dp),
+    )
+    Card(
+        shape  = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = ColorCard),
+        border = BorderStroke(0.5.dp, ColorCardStroke),
+    ) {
+        Column(content = content)
+    }
+}
+
+@Composable
+private fun SettingsToggle(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    sublabel: String,
+    checked: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 14.dp),
+            .clickable { onChange(!checked) }
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                Icons.Rounded.Security,
-                contentDescription = null,
-                tint     = ColorBlue,
-                modifier = Modifier.size(26.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                "TmVPN",
-                fontSize   = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color      = ColorTextPrimary,
-            )
+        Icon(icon, null, tint = ColorBlue, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(label, color = ColorTextPrimary, fontSize = 14.sp)
+            if (sublabel.isNotEmpty()) {
+                Text(sublabel, color = ColorTextSecondary, fontSize = 11.sp)
+            }
         }
-        IconButton(onClick = {}) {
-            Icon(
-                Icons.Rounded.Settings,
-                contentDescription = "Ayarlar",
-                tint     = ColorTextSecondary,
-                modifier = Modifier.size(20.dp),
-            )
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Status badge
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun StatusBadge(state: VpnViewModel.UiState) {
-    val (label, color, icon) = when (state) {
-        is VpnViewModel.UiState.Connected  -> Triple("KORUNUYOR",   ColorGreen,         Icons.Rounded.Lock)
-        is VpnViewModel.UiState.Connecting -> Triple("BAĞLANIYOR",  ColorAmber,         Icons.Rounded.Shield)
-        is VpnViewModel.UiState.Error      -> Triple("HATA",        ColorRed,           Icons.Rounded.Warning)
-        else                               -> Triple("KORUNMUYOR",  ColorTextSecondary, Icons.Rounded.LockOpen)
-    }
-
-    val tintAnim by animateColorAsState(color, tween(400), label = "badge")
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(tintAnim.copy(alpha = 0.10f))
-            .border(1.dp, tintAnim.copy(alpha = 0.25f), RoundedCornerShape(20.dp))
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-    ) {
-        Icon(icon, contentDescription = null, tint = tintAnim, modifier = Modifier.size(14.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(
-            label,
-            color         = tintAnim,
-            fontSize      = 12.sp,
-            fontWeight    = FontWeight.SemiBold,
-            letterSpacing = 1.5.sp,
+        Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor  = Color.White,
+                checkedTrackColor  = ColorGreen,
+                uncheckedTrackColor = ColorTextMuted,
+            ),
         )
     }
+    HorizontalDivider(color = ColorCardStroke, thickness = 0.5.dp)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsDropdown(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    value: String,
+    options: List<String>,
+    onChange: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor()
+                .clickable { expanded = true }
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, null, tint = ColorBlue, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(12.dp))
+            Text(label, color = ColorTextPrimary, fontSize = 14.sp, modifier = Modifier.weight(1f))
+            Text(value, color = ColorBlue, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.width(4.dp))
+            Icon(Icons.Rounded.ArrowDropDown, null, tint = ColorBlue, modifier = Modifier.size(18.dp))
+        }
+        ExposedDropdownMenu(
+            expanded         = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor   = ColorCard,
+        ) {
+            options.forEach { opt ->
+                DropdownMenuItem(
+                    text    = { Text(opt, color = if (opt == value) ColorBlue else ColorTextPrimary) },
+                    onClick = { onChange(opt); expanded = false },
+                )
+            }
+        }
+    }
+    HorizontalDivider(color = ColorCardStroke, thickness = 0.5.dp)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Premium connect orb
+// Shared: ConnectOrb
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -233,92 +633,56 @@ private fun ConnectOrb(state: VpnViewModel.UiState, onClick: () -> Unit) {
     val isEnabled    = isConnected || isReady
 
     val accentColor by animateColorAsState(
-        targetValue = when {
+        targetValue   = when {
             isConnected  -> ColorGreen
             isConnecting -> ColorAmber
             isReady      -> ColorBlue
             else         -> Color(0xFF1A2440)
         },
-        animationSpec = tween(500),
-        label         = "accent",
+        animationSpec = tween(500), label = "accent",
     )
 
     val infinite = rememberInfiniteTransition(label = "orb")
-
-    // Pulse ring scale & alpha (connected state only)
     val pulseScale by infinite.animateFloat(
-        initialValue  = 1.00f, targetValue = 1.14f,
-        animationSpec = infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label         = "scale",
+        1.00f, 1.14f,
+        infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse), "scale",
     )
     val pulseAlpha by infinite.animateFloat(
-        initialValue  = 0.18f, targetValue = 0.40f,
-        animationSpec = infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label         = "alpha",
+        0.18f, 0.40f,
+        infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse), "alpha",
     )
-
-    // Spinner rotation (connecting state only)
     val spinAngle by infinite.animateFloat(
-        initialValue  = 0f, targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(1300, easing = LinearEasing)),
-        label         = "spin",
+        0f, 360f,
+        infiniteRepeatable(tween(1300, easing = LinearEasing)), "spin",
     )
 
-    Box(modifier = Modifier.size(244.dp), contentAlignment = Alignment.Center) {
-
-        // Glow layers — concentric circles
+    Box(modifier = Modifier.size(240.dp), contentAlignment = Alignment.Center) {
+        // Glow halos
         androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
-            val cx = size.width / 2
-            val cy = size.height / 2
-            val c  = Offset(cx, cy)
-            listOf(
-                106.dp.toPx() to 0.04f,
-                92.dp.toPx()  to 0.08f,
-                80.dp.toPx()  to 0.13f,
-            ).forEach { (r, a) ->
-                drawCircle(accentColor.copy(alpha = a), radius = r, center = c)
-            }
+            val c = Offset(size.width / 2, size.height / 2)
+            listOf(106.dp.toPx() to 0.04f, 92.dp.toPx() to 0.08f, 80.dp.toPx() to 0.13f)
+                .forEach { (r, a) -> drawCircle(accentColor.copy(alpha = a), radius = r, center = c) }
         }
-
-        // Spinning arc (connecting only)
+        // Spinner (connecting)
         if (isConnecting) {
-            androidx.compose.foundation.Canvas(
-                modifier = Modifier
-                    .size(200.dp)
-                    .rotate(spinAngle),
-            ) {
+            androidx.compose.foundation.Canvas(modifier = Modifier.size(200.dp).rotate(spinAngle)) {
                 drawArc(
-                    brush      = Brush.sweepGradient(
-                        listOf(Color.Transparent, ColorAmber.copy(0.7f), ColorAmber)
-                    ),
-                    startAngle = 0f,
-                    sweepAngle = 260f,
-                    useCenter  = false,
-                    style      = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round),
+                    brush = Brush.sweepGradient(listOf(Color.Transparent, ColorAmber.copy(0.7f), ColorAmber)),
+                    startAngle = 0f, sweepAngle = 260f, useCenter = false,
+                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round),
                 )
             }
         }
-
-        // Pulse ring (connected only)
+        // Pulse ring (connected)
         if (isConnected) {
-            androidx.compose.foundation.Canvas(
-                modifier = Modifier.size(188.dp * pulseScale),
-            ) {
-                drawCircle(
-                    color  = ColorGreen.copy(alpha = pulseAlpha * 0.5f),
-                    style  = Stroke(width = 1.5.dp.toPx()),
-                )
+            androidx.compose.foundation.Canvas(modifier = Modifier.size(188.dp * pulseScale)) {
+                drawCircle(ColorGreen.copy(alpha = pulseAlpha * 0.5f), style = Stroke(1.5.dp.toPx()))
             }
         }
-
-        // Static ring border
+        // Static ring
         androidx.compose.foundation.Canvas(modifier = Modifier.size(188.dp)) {
-            drawCircle(
-                color = accentColor.copy(alpha = 0.30f),
-                style = Stroke(width = 1.dp.toPx()),
-            )
+            drawCircle(accentColor.copy(alpha = 0.30f), style = Stroke(1.dp.toPx()))
         }
-
         // Core button
         Box(
             modifier = Modifier
@@ -326,38 +690,34 @@ private fun ConnectOrb(state: VpnViewModel.UiState, onClick: () -> Unit) {
                 .clip(CircleShape)
                 .background(
                     Brush.radialGradient(
-                        colors = listOf(accentColor.copy(alpha = 0.22f), accentColor.copy(alpha = 0.06f))
+                        listOf(accentColor.copy(0.22f), accentColor.copy(0.06f))
                     )
                 )
                 .border(
-                    width  = 2.dp,
-                    brush  = Brush.linearGradient(
-                        listOf(accentColor.copy(alpha = 0.80f), accentColor.copy(alpha = 0.25f))
-                    ),
-                    shape  = CircleShape,
+                    2.dp,
+                    Brush.linearGradient(listOf(accentColor.copy(0.80f), accentColor.copy(0.25f))),
+                    CircleShape,
                 )
                 .clickable(enabled = isEnabled) { onClick() },
             contentAlignment = Alignment.Center,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
-                    imageVector = if (isConnected) Icons.Rounded.CheckCircle else Icons.Rounded.PowerSettingsNew,
-                    contentDescription = null,
+                    if (isConnected) Icons.Rounded.CheckCircle else Icons.Rounded.PowerSettingsNew,
+                    null,
                     tint     = if (isEnabled) accentColor else ColorTextSecondary,
                     modifier = Modifier.size(46.dp),
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = when (state) {
-                        is VpnViewModel.UiState.Connected  -> "KES"
+                        is VpnViewModel.UiState.Connected  -> "BAĞLI"
                         is VpnViewModel.UiState.Connecting -> "• • •"
                         is VpnViewModel.UiState.Ready      -> "BAĞLAN"
-                        is VpnViewModel.UiState.Loading    -> "YÜKLENİYOR"
-                        is VpnViewModel.UiState.Testing    -> "TEST"
-                        else                               -> "HAZIR DEĞİL"
+                        else                               -> "BEKLE"
                     },
                     color         = if (isEnabled) accentColor else ColorTextSecondary,
-                    fontSize      = 13.sp,
+                    fontSize      = 14.sp,
                     fontWeight    = FontWeight.Bold,
                     letterSpacing = 2.sp,
                 )
@@ -367,7 +727,7 @@ private fun ConnectOrb(state: VpnViewModel.UiState, onClick: () -> Unit) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Server panel
+// Shared: Server panel
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -376,46 +736,15 @@ private fun ServerPanel(
     selectedId: String,
     onSelect: (ServerConfig) -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-    ) {
-        Row(
-            modifier = Modifier.padding(bottom = 10.dp, start = 2.dp, end = 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                "Sunucular",
-                color      = ColorTextPrimary,
-                fontSize   = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier   = Modifier.weight(1f),
-            )
-            Text(
-                "${results.count { it.isReachable }} / ${results.size} erişilebilir",
-                color    = ColorTextSecondary,
-                fontSize = 12.sp,
-            )
-        }
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(results, key = { it.config.id }) { r ->
-                ServerRow(
-                    result   = r,
-                    selected = r.config.id == selectedId,
-                    onClick  = { onSelect(r.config) },
-                )
-            }
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(results, key = { it.config.id }) { r ->
+            ServerRow(r, r.config.id == selectedId) { onSelect(r.config) }
         }
     }
 }
 
 @Composable
-private fun ServerRow(
-    result: ServerPinger.Result,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
+private fun ServerRow(result: ServerPinger.Result, selected: Boolean, onClick: () -> Unit) {
     val latColor = latencyColor(result.latencyMs, result.isReachable)
     val bars     = signalBars(result.latencyMs, result.isReachable)
 
@@ -430,34 +759,28 @@ private fun ServerRow(
                     Brush.horizontalGradient(listOf(ColorCard, ColorCard))
             )
             .border(
-                width  = if (selected) 1.dp else 0.5.dp,
-                color  = if (selected) ColorBlue.copy(0.45f) else ColorCardStroke,
-                shape  = RoundedCornerShape(14.dp),
+                if (selected) 1.dp else 0.5.dp,
+                if (selected) ColorBlue.copy(0.45f) else ColorCardStroke,
+                RoundedCornerShape(14.dp),
             )
             .clickable { onClick() }
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // Icon box
             Box(
                 modifier = Modifier
                     .size(38.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(
-                        if (result.isReachable) latColor.copy(0.12f)
-                        else ColorTextMuted.copy(0.18f)
-                    ),
+                    .background(if (result.isReachable) latColor.copy(0.12f) else ColorTextMuted.copy(0.18f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.Rounded.Language,
-                    contentDescription = null,
+                    Icons.Rounded.Language, null,
                     tint     = if (result.isReachable) latColor else ColorTextMuted,
                     modifier = Modifier.size(18.dp),
                 )
             }
             Spacer(Modifier.width(12.dp))
-            // Name + protocol
             Column(Modifier.weight(1f)) {
                 Text(
                     result.config.remark,
@@ -469,26 +792,20 @@ private fun ServerRow(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         result.config.protocol.name,
-                        color         = ColorBlue.copy(0.9f),
-                        fontSize      = 10.sp,
-                        fontWeight    = FontWeight.Medium,
-                        modifier      = Modifier
+                        color      = ColorBlue.copy(0.9f),
+                        fontSize   = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier   = Modifier
                             .clip(RoundedCornerShape(4.dp))
                             .background(ColorBlue.copy(0.10f))
                             .padding(horizontal = 6.dp, vertical = 2.dp),
                     )
                     if (result.config.security != "none") {
                         Spacer(Modifier.width(4.dp))
-                        Icon(
-                            Icons.Rounded.Lock,
-                            contentDescription = null,
-                            tint     = ColorTextSecondary,
-                            modifier = Modifier.size(10.dp),
-                        )
+                        Icon(Icons.Rounded.Lock, null, tint = ColorTextSecondary, modifier = Modifier.size(10.dp))
                     }
                 }
             }
-            // Signal bars + latency
             Column(horizontalAlignment = Alignment.End) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -507,9 +824,7 @@ private fun ServerRow(
                 Spacer(Modifier.height(3.dp))
                 Text(
                     if (result.isReachable) "${result.latencyMs} ms" else "—",
-                    color      = latColor,
-                    fontSize   = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    color = latColor, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
                 )
             }
         }
@@ -517,91 +832,30 @@ private fun ServerRow(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Connected info panel
+// Shared: Status / Error
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun ConnectedPanel(server: ServerConfig) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        shape  = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = ColorCard),
-        border = BorderStroke(1.dp, ColorGreen.copy(0.28f)),
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Rounded.CheckCircle,
-                    contentDescription = null,
-                    tint     = ColorGreen,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text("Bağlı", color = ColorGreen, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            }
-            Spacer(Modifier.height(14.dp))
-            Text(server.remark, color = ColorTextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(4.dp))
-            Text("${server.address}:${server.port}", color = ColorTextSecondary, fontSize = 12.sp)
-            Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    server.protocol.name,
-                    color         = ColorBlue,
-                    fontSize      = 11.sp,
-                    fontWeight    = FontWeight.Medium,
-                    modifier      = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(ColorBlue.copy(0.10f))
-                        .padding(horizontal = 8.dp, vertical = 3.dp),
-                )
-                if (server.security != "none") {
-                    Spacer(Modifier.width(8.dp))
-                    Icon(Icons.Rounded.Lock, null, tint = ColorGreen, modifier = Modifier.size(12.dp))
-                    Spacer(Modifier.width(3.dp))
-                    Text(server.security, color = ColorTextSecondary, fontSize = 11.sp)
-                }
-            }
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Loading / Error panels
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun StatusPanel(message: String) {
+private fun StatusPanel(msg: String) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier            = Modifier.padding(top = 16.dp),
+        modifier            = Modifier.padding(top = 24.dp),
     ) {
-        CircularProgressIndicator(
-            color        = ColorBlue,
-            modifier     = Modifier.size(28.dp),
-            strokeWidth  = 2.dp,
-        )
+        CircularProgressIndicator(color = ColorBlue, modifier = Modifier.size(28.dp), strokeWidth = 2.dp)
         Spacer(Modifier.height(12.dp))
-        Text(message, color = ColorTextSecondary, fontSize = 14.sp)
+        Text(msg, color = ColorTextSecondary, fontSize = 14.sp)
     }
 }
 
 @Composable
-private fun ErrorPanel(message: String, onRetry: () -> Unit) {
+private fun ErrorPanel(msg: String, onRetry: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier            = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+        modifier            = Modifier.padding(24.dp),
     ) {
         Icon(Icons.Rounded.Warning, null, tint = ColorRed, modifier = Modifier.size(36.dp))
         Spacer(Modifier.height(10.dp))
-        Text(
-            message,
-            color     = ColorTextSecondary,
-            fontSize  = 13.sp,
-            textAlign = TextAlign.Center,
-        )
+        Text(msg, color = ColorTextSecondary, fontSize = 13.sp, textAlign = TextAlign.Center)
         Spacer(Modifier.height(16.dp))
         OutlinedButton(
             onClick = onRetry,
@@ -610,14 +864,29 @@ private fun ErrorPanel(message: String, onRetry: () -> Unit) {
         ) {
             Icon(Icons.Rounded.Refresh, null, modifier = Modifier.size(15.dp))
             Spacer(Modifier.width(6.dp))
-            Text("Tekrar dene", fontSize = 13.sp)
+            Text("Tekrar dene")
         }
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helpers
+// Formatters & helpers
 // ─────────────────────────────────────────────────────────────────────────────
+
+private fun formatSpeed(bps: Long): String = when {
+    bps >= 1_000_000 -> "%.1f MB/s".format(bps / 1_000_000.0)
+    bps >= 1_000     -> "%.1f KB/s".format(bps / 1_000.0)
+    else             -> "$bps B/s"
+}
+
+private fun formatBytes(bytes: Long): String = when {
+    bytes >= 1_000_000 -> "%.1f MB".format(bytes / 1_000_000.0)
+    bytes >= 1_000     -> "%.1f KB".format(bytes / 1_000.0)
+    else               -> "$bytes B"
+}
+
+private fun formatTime(sec: Long): String =
+    "%02d:%02d".format(sec / 60, sec % 60)
 
 private fun latencyColor(ms: Long, reachable: Boolean): Color = when {
     !reachable -> ColorRed
