@@ -1,73 +1,121 @@
 package com.seyit474.tmvpn.ping
 
 import com.seyit474.tmvpn.model.ServerConfig
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.*
+import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
+import javax.net.ssl.SSLSocket
+import javax.net.ssl.SSLSocketFactory
 
-/**
- * Sunucuların gerçek bağlantı gecikmesini ölçer.
- *
- * ICMP ping Android'de root gerektirir, o yüzden TCP ping kullanıyoruz:
- * SYN gönder → SYN/ACK gelene kadar geçen süre. Bu, gerçek kullanım
- * gecikmesine en yakın metrik.
- *
- * Tüm sunuculara aynı anda paralel istek atılır, sonuçlar sıralı döner.
- */
-class ServerPinger(
-    private val timeoutMs: Int = 3000,
-    private val attempts: Int = 2
-) {
+class ServerPinger(private val timeoutMs: Int = 4000) {
+
+    enum class Status { TESTING, OK, TLS_BLOCKED, UNREACHABLE }
 
     data class Result(
         val config: ServerConfig,
-        val latencyMs: Long,        // -1L = ulaşılamadı
-        val isReachable: Boolean
-    )
+        val latencyMs: Long = -1L,
+        val status: Status = Status.TESTING,
+    ) {
+        val isReachable: Boolean get() = status == Status.OK || status == Status.TLS_BLOCKED
+        val tlsOk: Boolean get() = status == Status.OK
+    }
 
+    // Live streaming ping — calls onUpdate each time a result arrives
+    fun pingAllStreaming(
+        configs: List<ServerConfig>,
+        scope: CoroutineScope,
+        onUpdate: (List<Result>) -> Unit,
+    ): Job = scope.launch {
+        val results = configs.map { Result(it, status = Status.TESTING) }.toMutableList()
+        onUpdate(results.toList())
+
+        configs.mapIndexed { i, cfg ->
+            async(Dispatchers.IO) {
+                val r = pingOne(cfg)
+                synchronized(results) { results[i] = r }
+                onUpdate(results.toList())
+            }
+        }.awaitAll()
+    }
+
+    // Blocking all-at-once (kept for backward compat)
     suspend fun pingAll(configs: List<ServerConfig>): List<Result> = coroutineScope {
-        configs.map { cfg ->
-            async(Dispatchers.IO) { pingOne(cfg) }
-        }.map { it.await() }
+        configs.map { cfg -> async(Dispatchers.IO) { pingOne(cfg) } }
+            .awaitAll()
             .sortedWith(
                 compareByDescending<Result> { it.isReachable }
-                    .thenBy { it.latencyMs }
+                    .thenBy { if (it.latencyMs < 0) Long.MAX_VALUE else it.latencyMs }
             )
     }
 
     suspend fun pickFastest(configs: List<ServerConfig>): ServerConfig? =
         pingAll(configs).firstOrNull { it.isReachable }?.config
 
+    // ── Core ping logic ──────────────────────────────────────────────────────
+
     private suspend fun pingOne(cfg: ServerConfig): Result = withContext(Dispatchers.IO) {
-        var best = Long.MAX_VALUE
-        var reachable = false
-        repeat(attempts) {
-            val t = measureTcpHandshake(cfg.address, cfg.port)
-            if (t != null) {
-                reachable = true
-                if (t < best) best = t
-            }
+        // Pre-resolve hostname once so TCP samples don't include DNS
+        val addr = resolveHost(cfg.address)
+            ?: return@withContext Result(cfg, -1L, Status.UNREACHABLE)
+
+        val latency = medianTcpMs(addr, cfg.port)
+            ?: return@withContext Result(cfg, -1L, Status.UNREACHABLE)
+
+        val needsTls = cfg.security in listOf("tls", "reality") &&
+                cfg.network in listOf("tcp", "grpc", "h2", "http", "httpupgrade")
+
+        val status = if (needsTls) {
+            if (tlsHandshake(addr, cfg.port, cfg.sni ?: cfg.address)) Status.OK
+            else Status.TLS_BLOCKED
+        } else {
+            Status.OK
         }
-        Result(
-            config = cfg,
-            latencyMs = if (reachable) best else -1L,
-            isReachable = reachable
-        )
+
+        Result(cfg, latency, status)
     }
 
-    private suspend fun measureTcpHandshake(host: String, port: Int): Long? =
+    // 3 TCP SYN→ACK attempts; returns median in ms, null if all failed
+    private suspend fun medianTcpMs(addr: InetAddress, port: Int): Long? {
+        val samples = mutableListOf<Long>()
+        repeat(3) {
+            val t = tcpHandshakeMs(addr, port)
+            if (t != null) samples.add(t)
+            if (samples.size == 1 && it == 0) return@repeat // first success: continue for more
+        }
+        if (samples.isEmpty()) return null
+        samples.sort()
+        return samples[samples.size / 2]
+    }
+
+    private suspend fun tcpHandshakeMs(addr: InetAddress, port: Int): Long? =
         withTimeoutOrNull(timeoutMs.toLong()) {
             runCatching {
-                val socket = Socket()
-                val start = System.currentTimeMillis()
-                socket.connect(InetSocketAddress(host, port), timeoutMs)
-                val elapsed = System.currentTimeMillis() - start
-                socket.close()
-                elapsed
+                Socket().use { socket ->
+                    val start = System.nanoTime()
+                    socket.connect(InetSocketAddress(addr, port), timeoutMs)
+                    (System.nanoTime() - start) / 1_000_000L
+                }
             }.getOrNull()
         }
+
+    private suspend fun resolveHost(host: String): InetAddress? =
+        withTimeoutOrNull(timeoutMs.toLong()) {
+            runCatching { InetAddress.getByName(host) }.getOrNull()
+        }
+
+    private suspend fun tlsHandshake(addr: InetAddress, port: Int, sni: String): Boolean =
+        withTimeoutOrNull(timeoutMs.toLong()) {
+            runCatching {
+                val factory = SSLSocketFactory.getDefault() as SSLSocketFactory
+                (factory.createSocket(addr, port) as SSLSocket).use { ssl ->
+                    ssl.soTimeout = timeoutMs
+                    ssl.sslParameters = ssl.sslParameters.also { it.serverNames = listOf(
+                        javax.net.ssl.SNIHostName(sni)
+                    )}
+                    ssl.startHandshake()
+                    true
+                }
+            }.getOrDefault(false)
+        } ?: false
 }
