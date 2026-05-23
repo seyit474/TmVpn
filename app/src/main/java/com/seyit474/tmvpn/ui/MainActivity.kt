@@ -41,7 +41,7 @@ class MainActivity : ComponentActivity() {
     private val vpnPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == RESULT_OK) vm.onConnectClicked()
+        if (result.resultCode == RESULT_OK) vm.connectVpn(this)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,8 +53,7 @@ class MainActivity : ComponentActivity() {
                     vm          = vm,
                     onConnect   = { requestVpnPermission() },
                     onDisconnect = {
-                        vm.markDisconnected()
-                        vm.refreshAndPickFastest()
+                        vm.disconnectVpn(this)
                     },
                 )
             }
@@ -64,7 +63,7 @@ class MainActivity : ComponentActivity() {
 
     private fun requestVpnPermission() {
         val intent = VpnService.prepare(this)
-        if (intent != null) vpnPermissionLauncher.launch(intent) else vm.onConnectClicked()
+        if (intent != null) vpnPermissionLauncher.launch(intent) else vm.connectVpn(this)
     }
 }
 
