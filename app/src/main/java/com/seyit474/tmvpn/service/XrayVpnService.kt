@@ -19,7 +19,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
-class XrayVpnService : VpnService() {
+class XrayVpnService : VpnService(), libv2ray.V2RayVPNServiceSupportsSet {
+
+    // V2RayVPNServiceSupportsSet — socket protection so Xray outbound doesn't loop
+    override fun protect(socket: Int): Boolean = super.protect(socket)
+    override fun onEmitStatus(l: Long, status: String?): Long = 0L
 
     private var tunInterface: ParcelFileDescriptor? = null
     private val serviceJob = SupervisorJob()
@@ -144,10 +148,10 @@ class XrayVpnService : VpnService() {
             // Xray'in dış bağlantıları VPN tünelinden geçer ve döngüye (routing loop) neden olur.
             // Şimdilik bu adım atlanmıştır — ileride XrayCoreProxy.setProtector(this) ile tamamlanacak.
 
-            // Xray çekirdeğini başlat
-            val xrayStarted = XrayCoreProxy.start(configJson)
+            // Xray çekirdeğini başlat (this = Context + V2RayVPNServiceSupportsSet)
+            val xrayStarted = XrayCoreProxy.start(configJson, this)
             if (!xrayStarted) {
-                Log.w(TAG, "Xray başlatılamadı (libXray.aar eksik veya yanlış API?); TUN açık devam ediyor")
+                Log.w(TAG, "Xray başlatılamadı; TUN açık devam ediyor")
             }
 
             // Bildirimi güncelle
