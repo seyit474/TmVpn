@@ -138,10 +138,17 @@ class XrayVpnService : VpnService() {
 
             tunInterface = tun
 
-            // Xray çekirdeğini başlat; this (VpnService) socket protection için kullanılır
-            val xrayStarted = XrayCoreProxy.start(configJson, this)
+            // TODO: Xray'in çıkış soketini korumak için bir socket-protector callback gereklidir.
+            // AndroidLibXrayLite'ın SocketProtector arayüzünü implement eden bir nesne
+            // LibXray.setSocketProtector(protector) ile kayıt edilmeli; aksi hâlde
+            // Xray'in dış bağlantıları VPN tünelinden geçer ve döngüye (routing loop) neden olur.
+            // Şimdilik bu adım atlanmıştır — ileride XrayCoreProxy.setProtector(this) ile tamamlanacak.
+
+            // Xray çekirdeğini başlat
+            val xrayStarted = XrayCoreProxy.start(configJson)
             if (!xrayStarted) {
-                Log.w(TAG, "Xray başlatılamadı; TUN açık devam ediyor")
+                Log.w(TAG, "Xray başlatılamadı (libXray.aar eksik?); bağlantı TUN üzerinden simüle ediliyor")
+                // .aar olmadan da UI akışını test edebilmek için devam ediyoruz
             }
 
             // Bildirimi güncelle
