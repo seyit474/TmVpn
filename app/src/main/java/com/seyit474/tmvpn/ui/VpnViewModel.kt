@@ -26,7 +26,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-private val Context.settingsDataStore by preferencesDataStore("app_settings")
+private val Context.settingsDataStore by preferencesDataStore("vm_core_settings")
 
 class VpnViewModel(
     application: Application,
