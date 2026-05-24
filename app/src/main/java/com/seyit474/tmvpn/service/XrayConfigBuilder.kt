@@ -216,33 +216,32 @@ object XrayConfigBuilder {
         bypassLan:   Boolean,
         preferIpType: String,
     ) = JSONObject().apply {
-        val strategy = when (preferIpType) {
-            "ipv4" -> "IPIfNonMatch"
-            "ipv6" -> "IPIfNonMatch"
-            else   -> "IPIfNonMatch"
-        }
-        put("domainStrategy", strategy)
+        put("domainStrategy", "IPIfNonMatch")
         put("rules", JSONArray().apply {
             put(rule(inboundTag = "dns-in", outboundTag = "proxy"))
-            if (bypassLan) put(rule(ip = "geoip:private", outboundTag = "direct"))
-            put(rule(domain = "geosite:category-ads-all", outboundTag = "block"))
+            if (bypassLan) put(rule(
+                ips = listOf("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
+                             "127.0.0.0/8", "169.254.0.0/16", "::1/128", "fc00::/7"),
+                outboundTag = "direct",
+            ))
             if (blockUdp443) put(JSONObject().apply {
                 put("type", "field"); put("network", "udp"); put("port", 443); put("outboundTag", "block")
             })
-            if (proxyGoogle) put(rule(domain = "geosite:google", outboundTag = "proxy"))
         })
     }
 
     private fun rule(
         inboundTag: String? = null,
         ip:         String? = null,
+        ips:        List<String>? = null,
         domain:     String? = null,
         outboundTag: String,
     ) = JSONObject().apply {
         put("type", "field")
         inboundTag?.let { put("inboundTag", JSONArray().put(it)) }
-        ip?.let          { put("ip",         JSONArray().put(it)) }
-        domain?.let      { put("domain",     JSONArray().put(it)) }
+        ip?.let          { put("ip", JSONArray().put(it)) }
+        ips?.let         { put("ip", JSONArray().apply { it.forEach { c -> put(c) } }) }
+        domain?.let      { put("domain", JSONArray().put(it)) }
         put("outboundTag", outboundTag)
     }
 
