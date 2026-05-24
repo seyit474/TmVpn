@@ -28,11 +28,10 @@ import kotlinx.coroutines.launch
 
 private val Context.settingsDataStore by preferencesDataStore("vm_core_settings")
 
-class VpnViewModel(
-    application: Application,
-    private val fetcher: SubscriptionFetcher = SubscriptionFetcher(),
-    private val pinger: ServerPinger = ServerPinger(),
-) : AndroidViewModel(application) {
+class VpnViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val fetcher = SubscriptionFetcher()
+    private val pinger  = ServerPinger()
 
     private companion object {
         const val TAG = "VpnViewModel"
