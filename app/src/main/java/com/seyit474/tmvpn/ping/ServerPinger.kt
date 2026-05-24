@@ -69,26 +69,20 @@ class ServerPinger(private val timeoutMs: Int = 4000) {
         val addr = resolveHost(cfg.address)
             ?: return@withContext Result(cfg, -1L, Status.UNREACHABLE)
 
-        return@withContext when (cfg.security) {
-            "tls" -> {
-                // TCP + TLS handshake — most realistic, matches what users actually experience
-                val sni = cfg.sni ?: cfg.address
-                val latency = tlsHandshakeMs(addr, cfg.port, sni)
-                if (latency != null) Result(cfg, latency, Status.OK)
-                else Result(cfg, -1L, Status.TLS_BLOCKED)
-            }
-            "reality" -> {
-                // Reality rejects standard TLS — fall back to TCP only
-                val latency = medianTcpMs(addr, cfg.port)
-                    ?: return@withContext Result(cfg, -1L, Status.UNREACHABLE)
-                Result(cfg, latency, Status.OK)
-            }
-            else -> {
-                val latency = medianTcpMs(addr, cfg.port)
-                    ?: return@withContext Result(cfg, -1L, Status.UNREACHABLE)
-                Result(cfg, latency, Status.OK)
-            }
+        // TCP latency is always measured first — fast and always works
+        val tcpLatency = medianTcpMs(addr, cfg.port)
+            ?: return@withContext Result(cfg, -1L, Status.UNREACHABLE)
+
+        // For TLS servers try a real TLS handshake for more accurate latency.
+        // If standard Java SSL fails (Xray uses uTLS / custom fingerprints),
+        // fall back to TCP time and still mark OK — Xray handles TLS differently.
+        val latency = if (cfg.security == "tls") {
+            tlsHandshakeMs(addr, cfg.port, cfg.sni ?: cfg.address) ?: tcpLatency
+        } else {
+            tcpLatency
         }
+
+        Result(cfg, latency, Status.OK)
     }
 
     // TCP + TLS handshake time — measures what users actually feel (DNS excluded)
