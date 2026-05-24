@@ -17,7 +17,7 @@ android {
         // Subscription URL — GitHub Actions'ta SUBSCRIPTION_URL secret'ından gelir.
         val subUrl: String = System.getenv("SUBSCRIPTION_URL")
             ?: project.findProperty("SUBSCRIPTION_URL") as String?
-            ?: ""
+            ?: "http://194.36.89.199:4541/sub/VG12cG4sMTc3OTYwMjc1MQ-qXorJw20l"
         buildConfigField("String", "SUBSCRIPTION_URL", "\"$subUrl\"")
     }
 
