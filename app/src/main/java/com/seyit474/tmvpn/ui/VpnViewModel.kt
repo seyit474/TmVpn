@@ -159,10 +159,16 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.Default) {
             val servers = runCatching { ConfigParser.parseSubscription(body) }.getOrNull()
             if (servers.isNullOrEmpty()) return@launch
-            val results = servers.map { ServerPinger.Result(it, -1L, ServerPinger.Status.TESTING) }
-            if (_state.value is UiState.Idle) {
-                _state.value = UiState.Ready(results, results.first().config)
-            }
+            if (_state.value !is UiState.Idle) return@launch
+            // Show cached servers immediately, then ping in background
+            val initial = servers.map { ServerPinger.Result(it, -1L, ServerPinger.Status.TESTING) }
+            _state.value = UiState.Ready(initial, initial.first().config)
+            pinger.pingAllStreaming(servers, this) { results ->
+                val selected = results.firstOrNull { it.isReachable }?.config ?: results.first().config
+                val ready = UiState.Ready(results, selected)
+                lastReady = ready
+                _state.value = ready
+            }.join()
         }
     }
 
@@ -230,16 +236,18 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
                 _state.value = UiState.Error("Sunucu bulunamadı")
                 return@launch
             }
-            _state.value = UiState.Testing
-            val results = pinger.pingAll(list)
-            val fastest = results.firstOrNull { it.isReachable }?.config
-            if (fastest == null) {
-                _state.value = UiState.Error("Hiçbir sunucuya ulaşılamadı")
-                return@launch
-            }
-            val ready = UiState.Ready(results, fastest)
-            lastReady = ready
-            _state.value = ready
+            // Show all servers immediately as TESTING — list never disappears
+            val testing = list.map { ServerPinger.Result(it, -1L, ServerPinger.Status.TESTING) }
+            val prevSelected = (_state.value as? UiState.Ready)?.selected ?: testing.first().config
+            _state.value = UiState.Ready(testing, prevSelected)
+
+            // Ping all servers with live streaming updates
+            pinger.pingAllStreaming(list, this) { results ->
+                val selected = results.firstOrNull { it.isReachable }?.config ?: prevSelected
+                val ready = UiState.Ready(results, selected)
+                lastReady = ready
+                _state.value = ready
+            }.join()
         }
     }
 
