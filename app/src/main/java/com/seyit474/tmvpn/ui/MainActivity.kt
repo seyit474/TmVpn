@@ -931,7 +931,6 @@ private inline fun <reified T> DRow(
         .collectAsStateWithLifecycle(initialValue = default)
     var showEdit by remember { mutableStateOf(false) }
     var textInput by remember(value) { mutableStateOf(value.toString()) }
-    val s = LocalStr.current
 
     Row(
         modifier = Modifier.fillMaxWidth().clickable { showEdit = !showEdit }
