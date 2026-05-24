@@ -12,19 +12,22 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -41,6 +44,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -65,22 +70,22 @@ private val TxtSec     = Color(0xFF6B7A99)
 private val TxtMuted   = Color(0xFF3A4560)
 private val CardBorder = Color(0xFF1A2440)
 
-// ─── Language strings ─────────────────────────────────────────────────────────
+// ─── Strings ─────────────────────────────────────────────────────────────────
 data class Str(
     val tabHome: String, val tabServers: String, val tabSettings: String,
     val statusActive: String, val statusConnecting: String,
     val statusReady: String, val statusIdle: String, val statusError: String,
     val orbConnected: String, val orbConnect: String, val orbWait: String,
     val activeServer: String, val selectedServer: String,
-    val loadingServers: String, val testingPing: String,
+    val loadingServers: String,
     val pingBlocked: String, val pingUnreachable: String,
     val btnRefresh: String, val btnTest: String,
     val connectedWarning: String,
     val serverCount: (Int) -> String,
     val retry: String,
-    val grpFragment: String, val grpMux: String, val grpRouting: String,
-    val grpDns: String, val grpVpn: String, val grpApp: String,
-    val grpAbout: String, val grpAccount: String, val grpLanguage: String,
+    val grpLanguage: String, val grpFragment: String, val grpMux: String,
+    val grpRouting: String, val grpDns: String, val grpVpn: String,
+    val grpApp: String, val grpAccount: String, val grpAbout: String,
     val settingFragment: String, val settingPackets: String,
     val settingLength: String, val settingInterval: String,
     val settingMux: String, val settingQuicMux: String,
@@ -92,6 +97,7 @@ data class Str(
     val version: String, val developer: String,
     val langLabel: String,
     val langTurkmen: String, val langTurkish: String, val langRussian: String,
+    val confirm: String,
 )
 
 private val strTr = Str(
@@ -100,27 +106,27 @@ private val strTr = Str(
     statusReady = "Hazır", statusIdle = "Pasif", statusError = "Hata",
     orbConnected = "BAĞLI", orbConnect = "BAĞLAN", orbWait = "BEKLE",
     activeServer = "Aktif Sunucu", selectedServer = "Seçili Sunucu",
-    loadingServers = "Sunucular alınıyor…", testingPing = "Test ediliyor…",
+    loadingServers = "Sunucular alınıyor…",
     pingBlocked = "Engelli", pingUnreachable = "Yok",
     btnRefresh = "Yenile", btnTest = "Test",
     connectedWarning = "Bağlı — sunucu değiştirmek için önce kes",
-    serverCount = { "$it sunucu" },
-    retry = "Tekrar dene",
-    grpFragment = "FRAGMENT", grpMux = "MUX", grpRouting = "YÖNLENDİRME",
-    grpDns = "DNS", grpVpn = "VPN", grpApp = "UYGULAMA",
-    grpAbout = "HAKKINDA", grpAccount = "HESAP", grpLanguage = "DİL",
+    serverCount = { "$it sunucu" }, retry = "Tekrar dene",
+    grpLanguage = "Dil", grpFragment = "Fragment", grpMux = "Mux",
+    grpRouting = "Yönlendirme", grpDns = "DNS", grpVpn = "VPN",
+    grpApp = "Uygulama", grpAccount = "Hesap", grpAbout = "Hakkında",
     settingFragment = "Fragment", settingPackets = "Paketler",
     settingLength = "Uzunluk", settingInterval = "Aralık",
     settingMux = "Mux", settingQuicMux = "QUIC Mux",
     settingUdp443 = "UDP 443 Blokla", settingGoogle = "Google Proxy",
-    settingLan = "LAN Bypass",
-    settingSniffing = "Sniffing", settingRouteOnly = "Sadece Yönlendirme",
-    settingRemoteDns = "Remote DNS", settingMtu = "MTU",
-    settingAutoSelect = "Otomatik Seçim", settingLogLevel = "Log",
-    accountId = "Hesap ID", copy = "Kopyala", copied = "Kopyalandı",
+    settingLan = "LAN Bypass", settingSniffing = "Sniffing",
+    settingRouteOnly = "Sadece Yönlendirme", settingRemoteDns = "Remote DNS",
+    settingMtu = "MTU", settingAutoSelect = "Otomatik Seçim",
+    settingLogLevel = "Log", accountId = "Hesap ID",
+    copy = "Kopyala", copied = "Kopyalandı",
     version = "Sürüm", developer = "Geliştirici",
     langLabel = "Dil Seçimi",
     langTurkmen = "Türkmençe", langTurkish = "Türkçe", langRussian = "Rusça",
+    confirm = "Onayla",
 )
 
 private val strTk = Str(
@@ -129,27 +135,27 @@ private val strTk = Str(
     statusReady = "Taýyn", statusIdle = "Işjeň däl", statusError = "Ýalňyşlyk",
     orbConnected = "BAGLANDY", orbConnect = "BAGLAN", orbWait = "GARAŞ",
     activeServer = "Işjeň Serwer", selectedServer = "Saýlanan Serwer",
-    loadingServers = "Serwerler ýüklenýär…", testingPing = "Synag edilýär…",
+    loadingServers = "Serwerler ýüklenýär…",
     pingBlocked = "Petiklenen", pingUnreachable = "Elýok",
     btnRefresh = "Täzele", btnTest = "Synag",
     connectedWarning = "Baglandy — üýtgetmek üçin kes",
-    serverCount = { "$it serwer" },
-    retry = "Täzeden synanyş",
-    grpFragment = "BÖLÜNME", grpMux = "MUX", grpRouting = "UGUR",
-    grpDns = "DNS", grpVpn = "VPN", grpApp = "PROGRAMMA",
-    grpAbout = "BARADA", grpAccount = "HASAP", grpLanguage = "DIL",
+    serverCount = { "$it serwer" }, retry = "Täzeden synanyş",
+    grpLanguage = "Dil", grpFragment = "Fragment", grpMux = "Mux",
+    grpRouting = "Ugur", grpDns = "DNS", grpVpn = "VPN",
+    grpApp = "Programma", grpAccount = "Hasap", grpAbout = "Barada",
     settingFragment = "Fragment", settingPackets = "Paketler",
     settingLength = "Uzynlyk", settingInterval = "Aralyk",
     settingMux = "Mux", settingQuicMux = "QUIC Mux",
     settingUdp443 = "UDP 443 Bloklama", settingGoogle = "Google Proxy",
-    settingLan = "LAN Bypass",
-    settingSniffing = "Sniffing", settingRouteOnly = "Diňe Ugur",
-    settingRemoteDns = "Remote DNS", settingMtu = "MTU",
-    settingAutoSelect = "Awtomatik Saýlaw", settingLogLevel = "Log",
-    accountId = "Hasap ID", copy = "Göçür", copied = "Göçürildi",
+    settingLan = "LAN Bypass", settingSniffing = "Sniffing",
+    settingRouteOnly = "Diňe Ugur", settingRemoteDns = "Remote DNS",
+    settingMtu = "MTU", settingAutoSelect = "Awtomatik Saýlaw",
+    settingLogLevel = "Log", accountId = "Hasap ID",
+    copy = "Göçür", copied = "Göçürildi",
     version = "Wersiýa", developer = "Işläp düzüji",
     langLabel = "Dil saýlawy",
     langTurkmen = "Türkmençe", langTurkish = "Türkçe", langRussian = "Rusça",
+    confirm = "Tassykla",
 )
 
 private val strRu = Str(
@@ -158,33 +164,33 @@ private val strRu = Str(
     statusReady = "Готов", statusIdle = "Неактивен", statusError = "Ошибка",
     orbConnected = "ПОДКЛЮЧЁН", orbConnect = "ПОДКЛЮЧИТЬ", orbWait = "ОЖИДАЙТЕ",
     activeServer = "Активный сервер", selectedServer = "Выбранный сервер",
-    loadingServers = "Загрузка серверов…", testingPing = "Тестирование…",
+    loadingServers = "Загрузка серверов…",
     pingBlocked = "Заблокирован", pingUnreachable = "Недоступен",
     btnRefresh = "Обновить", btnTest = "Тест",
     connectedWarning = "Подключено — отключитесь для смены",
-    serverCount = { "$it серверов" },
-    retry = "Повторить",
-    grpFragment = "ФРАГМЕНТ", grpMux = "MUX", grpRouting = "МАРШРУТИЗАЦИЯ",
-    grpDns = "DNS", grpVpn = "VPN", grpApp = "ПРИЛОЖЕНИЕ",
-    grpAbout = "О ПРОГРАММЕ", grpAccount = "АККАУНТ", grpLanguage = "ЯЗЫК",
+    serverCount = { "$it серверов" }, retry = "Повторить",
+    grpLanguage = "Язык", grpFragment = "Фрагмент", grpMux = "Mux",
+    grpRouting = "Маршрутизация", grpDns = "DNS", grpVpn = "VPN",
+    grpApp = "Приложение", grpAccount = "Аккаунт", grpAbout = "О программе",
     settingFragment = "Фрагмент", settingPackets = "Пакеты",
     settingLength = "Длина", settingInterval = "Интервал",
     settingMux = "Mux", settingQuicMux = "QUIC Mux",
     settingUdp443 = "Блок UDP 443", settingGoogle = "Google Proxy",
-    settingLan = "LAN Bypass",
-    settingSniffing = "Сниффинг", settingRouteOnly = "Только маршрут",
-    settingRemoteDns = "Remote DNS", settingMtu = "MTU",
-    settingAutoSelect = "Авто-выбор", settingLogLevel = "Лог",
-    accountId = "ID аккаунта", copy = "Копировать", copied = "Скопировано",
+    settingLan = "LAN Bypass", settingSniffing = "Сниффинг",
+    settingRouteOnly = "Только маршрут", settingRemoteDns = "Remote DNS",
+    settingMtu = "MTU", settingAutoSelect = "Авто-выбор",
+    settingLogLevel = "Лог", accountId = "ID аккаунта",
+    copy = "Копировать", copied = "Скопировано",
     version = "Версия", developer = "Разработчик",
     langLabel = "Выбор языка",
     langTurkmen = "Туркменский", langTurkish = "Турецкий", langRussian = "Русский",
+    confirm = "Подтвердить",
 )
 
 private val LocalStr = compositionLocalOf { strTr }
 private const val PREF_LANG = "app_lang"
 
-// ─── Tab ─────────────────────────────────────────────────────────────────────
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
 private enum class Tab { HOME, SERVERS, SETTINGS }
 
 // ─── Activity ─────────────────────────────────────────────────────────────────
@@ -202,23 +208,14 @@ class MainActivity : ComponentActivity() {
         setContent {
             var langCode by remember { mutableStateOf(prefs.getString(PREF_LANG, "tr") ?: "tr") }
             val strings = when (langCode) { "tk" -> strTk; "ru" -> strRu; else -> strTr }
-
             CompositionLocalProvider(LocalStr provides strings) {
                 MaterialTheme(
-                    colorScheme = darkColorScheme(
-                        primary    = AccBlue,
-                        background = BgDeep,
-                        surface    = BgCard,
-                    )
+                    colorScheme = darkColorScheme(primary = AccBlue, background = BgDeep, surface = BgCard)
                 ) {
                     AppRoot(
-                        vm        = vm,
-                        prefs     = prefs,
-                        langCode  = langCode,
-                        onLangChange = { code ->
-                            langCode = code
-                            prefs.edit().putString(PREF_LANG, code).apply()
-                        },
+                        vm = vm,
+                        langCode = langCode,
+                        onLangChange = { code -> langCode = code; prefs.edit().putString(PREF_LANG, code).apply() },
                         onConnect = { onConnectClicked() },
                     )
                 }
@@ -247,9 +244,8 @@ class MainActivity : ComponentActivity() {
             com.seyit474.tmvpn.settings.AppSettings.Defaults.FRAGMENT_ENABLED,
         )
         val configJson = XrayConfigBuilder.build(
-            cfg,
-            enableFragment = fragEnabled,
-            hwidUuid       = com.seyit474.tmvpn.hwid.HwidManager.getHwid(this),
+            cfg, enableFragment = fragEnabled,
+            hwidUuid = com.seyit474.tmvpn.hwid.HwidManager.getHwid(this),
         )
         XrayVpnService.start(this, configJson, cfg.remark)
         vm.markConnected(cfg)
@@ -258,15 +254,9 @@ class MainActivity : ComponentActivity() {
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
 @Composable
-fun AppRoot(
-    vm: VpnViewModel,
-    prefs: SharedPreferences,
-    langCode: String,
-    onLangChange: (String) -> Unit,
-    onConnect: () -> Unit,
-) {
+fun AppRoot(vm: VpnViewModel, langCode: String, onLangChange: (String) -> Unit, onConnect: () -> Unit) {
     val s = LocalStr.current
-    var currentTab by remember { mutableStateOf(Tab.HOME) }
+    var tab by remember { mutableStateOf(Tab.HOME) }
 
     Scaffold(
         containerColor = BgDeep,
@@ -274,18 +264,16 @@ fun AppRoot(
             NavigationBar(
                 containerColor = BgSurface,
                 tonalElevation = 0.dp,
-                modifier       = Modifier.border(0.5.dp, CardBorder),
+                modifier = Modifier.border(0.5.dp, CardBorder),
             ) {
-                NavItem(Icons.Filled.Home, s.tabHome, currentTab == Tab.HOME) { currentTab = Tab.HOME }
-                NavItem(Icons.Filled.Dns, s.tabServers, currentTab == Tab.SERVERS) { currentTab = Tab.SERVERS }
-                NavItem(Icons.Filled.Settings, s.tabSettings, currentTab == Tab.SETTINGS) { currentTab = Tab.SETTINGS }
+                NavBtn(Icons.Filled.Home, s.tabHome, tab == Tab.HOME) { tab = Tab.HOME }
+                NavBtn(Icons.Filled.Dns, s.tabServers, tab == Tab.SERVERS) { tab = Tab.SERVERS }
+                NavBtn(Icons.Filled.Settings, s.tabSettings, tab == Tab.SETTINGS) { tab = Tab.SETTINGS }
             }
         },
     ) { padding ->
-        Box(
-            modifier = Modifier.fillMaxSize().padding(padding).background(BgDeep),
-        ) {
-            when (currentTab) {
+        Box(modifier = Modifier.fillMaxSize().padding(padding).background(BgDeep)) {
+            when (tab) {
                 Tab.HOME     -> HomeTab(vm, onConnect)
                 Tab.SERVERS  -> ServersTab(vm)
                 Tab.SETTINGS -> SettingsTab(langCode, onLangChange)
@@ -295,14 +283,14 @@ fun AppRoot(
 }
 
 @Composable
-private fun RowScope.NavItem(icon: ImageVector, label: String, selected: Boolean, onClick: () -> Unit) {
+private fun RowScope.NavBtn(icon: ImageVector, label: String, selected: Boolean, onClick: () -> Unit) {
     NavigationBarItem(
         selected = selected, onClick = onClick,
-        icon     = { Icon(icon, null, modifier = Modifier.size(22.dp)) },
-        label    = { Text(label, fontSize = 11.sp) },
-        colors   = NavigationBarItemDefaults.colors(
-            selectedIconColor   = AccBlue, selectedTextColor = AccBlue,
-            indicatorColor      = AccBlue.copy(alpha = 0.12f),
+        icon = { Icon(icon, null, modifier = Modifier.size(22.dp)) },
+        label = { Text(label, fontSize = 11.sp) },
+        colors = NavigationBarItemDefaults.colors(
+            selectedIconColor = AccBlue, selectedTextColor = AccBlue,
+            indicatorColor = AccBlue.copy(0.12f),
             unselectedIconColor = TxtSec, unselectedTextColor = TxtSec,
         ),
     )
@@ -315,12 +303,12 @@ private fun HomeTab(vm: VpnViewModel, onConnect: () -> Unit) {
     val s = LocalStr.current
 
     Column(
-        modifier            = Modifier.fillMaxSize().systemBarsPadding(),
+        modifier = Modifier.fillMaxSize().systemBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(
-            modifier              = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
-            verticalAlignment     = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -335,7 +323,7 @@ private fun HomeTab(vm: VpnViewModel, onConnect: () -> Unit) {
         }
 
         Spacer(Modifier.height(8.dp))
-        ConnectOrb(state = state, s = s, onClick = onConnect)
+        ConnectOrb(state, s, onConnect)
         Spacer(Modifier.height(24.dp))
 
         when (val st = state) {
@@ -360,18 +348,18 @@ private fun StatusBadge(state: VpnViewModel.UiState, s: Str) {
         is VpnViewModel.UiState.Ready     -> s.statusReady     to AccBlue
         else                              -> s.statusIdle      to TxtSec
     }
-    val animColor by animateColorAsState(color, tween(400), label = "badge")
+    val anim by animateColorAsState(color, tween(400), label = "badge")
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(animColor.copy(0.12f))
-            .border(1.dp, animColor.copy(0.30f), RoundedCornerShape(20.dp))
+            .background(anim.copy(0.12f))
+            .border(1.dp, anim.copy(0.30f), RoundedCornerShape(20.dp))
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(animColor))
+        Box(Modifier.size(7.dp).clip(CircleShape).background(anim))
         Spacer(Modifier.width(5.dp))
-        Text(label, color = animColor, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        Text(label, color = anim, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -382,84 +370,47 @@ private fun ConnectOrb(state: VpnViewModel.UiState, s: Str, onClick: () -> Unit)
     val isReady      = state is VpnViewModel.UiState.Ready
     val isEnabled    = isConnected || isReady
 
-    val accentColor by animateColorAsState(
-        targetValue = when {
-            isConnected  -> AccGreen
-            isConnecting -> AccAmber
-            isReady      -> AccBlue
-            else         -> Color(0xFF1A2440)
-        },
-        animationSpec = tween(500), label = "accent",
+    val accent by animateColorAsState(
+        when { isConnected -> AccGreen; isConnecting -> AccAmber; isReady -> AccBlue; else -> Color(0xFF1A2440) },
+        tween(500), label = "accent",
     )
+    val inf = rememberInfiniteTransition(label = "orb")
+    val pulseScale by inf.animateFloat(1f, 1.14f, infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse), "ps")
+    val pulseAlpha by inf.animateFloat(0.18f, 0.40f, infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse), "pa")
+    val spin by inf.animateFloat(0f, 360f, infiniteRepeatable(tween(1300, easing = LinearEasing)), "spin")
 
-    val infinite = rememberInfiniteTransition(label = "orb")
-    val pulseScale by infinite.animateFloat(
-        1.00f, 1.14f,
-        infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse), "scale",
-    )
-    val pulseAlpha by infinite.animateFloat(
-        0.18f, 0.40f,
-        infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse), "alpha",
-    )
-    val spinAngle by infinite.animateFloat(
-        0f, 360f, infiniteRepeatable(tween(1300, easing = LinearEasing)), "spin",
-    )
-
-    Box(modifier = Modifier.size(240.dp), contentAlignment = Alignment.Center) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
+    Box(Modifier.size(240.dp), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
             val c = Offset(size.width / 2, size.height / 2)
             listOf(106.dp.toPx() to 0.04f, 92.dp.toPx() to 0.08f, 80.dp.toPx() to 0.13f)
-                .forEach { (r, a) -> drawCircle(accentColor.copy(alpha = a), radius = r, center = c) }
+                .forEach { (r, a) -> drawCircle(accent.copy(a), r, c) }
         }
-        if (isConnecting) {
-            Canvas(modifier = Modifier.size(200.dp).rotate(spinAngle)) {
-                drawArc(
-                    brush      = Brush.sweepGradient(listOf(Color.Transparent, AccAmber.copy(0.7f), AccAmber)),
-                    startAngle = 0f, sweepAngle = 260f, useCenter = false,
-                    style      = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round),
-                )
-            }
+        if (isConnecting) Canvas(Modifier.size(200.dp).rotate(spin)) {
+            drawArc(Brush.sweepGradient(listOf(Color.Transparent, AccAmber.copy(0.7f), AccAmber)),
+                0f, 260f, false, style = Stroke(3.dp.toPx(), cap = StrokeCap.Round))
         }
-        if (isConnected) {
-            Canvas(modifier = Modifier.size(188.dp * pulseScale)) {
-                drawCircle(AccGreen.copy(alpha = pulseAlpha * 0.5f), style = Stroke(1.5.dp.toPx()))
-            }
+        if (isConnected) Canvas(Modifier.size(188.dp * pulseScale)) {
+            drawCircle(AccGreen.copy(pulseAlpha * 0.5f), style = Stroke(1.5.dp.toPx()))
         }
-        Canvas(modifier = Modifier.size(188.dp)) {
-            drawCircle(accentColor.copy(alpha = 0.30f), style = Stroke(1.dp.toPx()))
-        }
+        Canvas(Modifier.size(188.dp)) { drawCircle(accent.copy(0.30f), style = Stroke(1.dp.toPx())) }
         Box(
             modifier = Modifier
-                .size(168.dp)
-                .clip(CircleShape)
-                .background(Brush.radialGradient(listOf(accentColor.copy(0.22f), accentColor.copy(0.06f))))
-                .border(
-                    2.dp,
-                    Brush.linearGradient(listOf(accentColor.copy(0.80f), accentColor.copy(0.25f))),
-                    CircleShape,
-                )
+                .size(168.dp).clip(CircleShape)
+                .background(Brush.radialGradient(listOf(accent.copy(0.22f), accent.copy(0.06f))))
+                .border(2.dp, Brush.linearGradient(listOf(accent.copy(0.80f), accent.copy(0.25f))), CircleShape)
                 .clickable(enabled = isEnabled) { onClick() },
             contentAlignment = Alignment.Center,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
-                    imageVector = if (isConnected) Icons.Filled.CheckCircle else Icons.Filled.PowerSettingsNew,
-                    contentDescription = null,
-                    tint     = if (isEnabled) accentColor else TxtSec,
-                    modifier = Modifier.size(46.dp),
+                    if (isConnected) Icons.Filled.CheckCircle else Icons.Filled.PowerSettingsNew,
+                    null, tint = if (isEnabled) accent else TxtSec, modifier = Modifier.size(46.dp),
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = when {
-                        isConnected  -> s.orbConnected
-                        isConnecting -> "• • •"
-                        isReady      -> s.orbConnect
-                        else         -> s.orbWait
-                    },
-                    color         = if (isEnabled) accentColor else TxtSec,
-                    fontSize      = 14.sp,
-                    fontWeight    = FontWeight.Bold,
-                    letterSpacing = 2.sp,
+                    when { isConnected -> s.orbConnected; isConnecting -> "• • •"; isReady -> s.orbConnect; else -> s.orbWait },
+                    color = if (isEnabled) accent else TxtSec,
+                    fontSize = 14.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp,
                 )
             }
         }
@@ -471,32 +422,27 @@ private fun TrafficPanel() {
     val stats by com.seyit474.tmvpn.util.TrafficCounter.stats.collectAsStateWithLifecycle()
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        shape    = RoundedCornerShape(16.dp),
-        colors   = CardDefaults.cardColors(containerColor = BgCard),
-        border   = BorderStroke(0.5.dp, CardBorder),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(BgCard),
+        border = BorderStroke(0.5.dp, CardBorder),
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                TrafficCell(Icons.Filled.Schedule,
-                    com.seyit474.tmvpn.util.TrafficCounter.formatDuration(stats.connectedSeconds), AccBlue)
-                TrafficCell(Icons.Filled.ArrowDownward,
-                    com.seyit474.tmvpn.util.TrafficCounter.formatSpeed(stats.downloadSpeed), AccGreen)
-                TrafficCell(Icons.Filled.ArrowUpward,
-                    com.seyit474.tmvpn.util.TrafficCounter.formatSpeed(stats.uploadSpeed), AccAmber)
+        Column(Modifier.padding(20.dp)) {
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                TCell(Icons.Filled.Schedule, com.seyit474.tmvpn.util.TrafficCounter.formatDuration(stats.connectedSeconds), AccBlue)
+                TCell(Icons.Filled.ArrowDownward, com.seyit474.tmvpn.util.TrafficCounter.formatSpeed(stats.downloadSpeed), AccGreen)
+                TCell(Icons.Filled.ArrowUpward, com.seyit474.tmvpn.util.TrafficCounter.formatSpeed(stats.uploadSpeed), AccAmber)
             }
             Spacer(Modifier.height(10.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("↓ ${com.seyit474.tmvpn.util.TrafficCounter.formatBytes(stats.downloadBytes)}",
-                    fontSize = 11.sp, color = TxtSec)
-                Text("↑ ${com.seyit474.tmvpn.util.TrafficCounter.formatBytes(stats.uploadBytes)}",
-                    fontSize = 11.sp, color = TxtSec)
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                Text("↓ ${com.seyit474.tmvpn.util.TrafficCounter.formatBytes(stats.downloadBytes)}", fontSize = 11.sp, color = TxtSec)
+                Text("↑ ${com.seyit474.tmvpn.util.TrafficCounter.formatBytes(stats.uploadBytes)}", fontSize = 11.sp, color = TxtSec)
             }
         }
     }
 }
 
 @Composable
-private fun TrafficCell(icon: ImageVector, value: String, color: Color) {
+private fun TCell(icon: ImageVector, value: String, color: Color) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(icon, null, tint = color, modifier = Modifier.size(20.dp))
         Spacer(Modifier.height(4.dp))
@@ -508,15 +454,13 @@ private fun TrafficCell(icon: ImageVector, value: String, color: Color) {
 private fun ActiveServerCard(server: com.seyit474.tmvpn.model.ServerConfig, isActive: Boolean, s: Str) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        shape    = RoundedCornerShape(14.dp),
-        colors   = CardDefaults.cardColors(containerColor = BgCard),
-        border   = BorderStroke(0.5.dp, if (isActive) AccGreen.copy(0.25f) else CardBorder),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(BgCard),
+        border = BorderStroke(0.5.dp, if (isActive) AccGreen.copy(0.25f) else CardBorder),
     ) {
-        Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier         = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(AccBlue.copy(0.12f)),
-                contentAlignment = Alignment.Center,
-            ) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(AccBlue.copy(0.12f)),
+                contentAlignment = Alignment.Center) {
                 Icon(Icons.Filled.Public, null, tint = AccBlue, modifier = Modifier.size(20.dp))
             }
             Spacer(Modifier.width(12.dp))
@@ -525,7 +469,7 @@ private fun ActiveServerCard(server: com.seyit474.tmvpn.model.ServerConfig, isAc
                 Text(server.remark, color = TxtPri, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 Text("${server.protocol.name} • ${server.network.uppercase()}", color = TxtSec, fontSize = 12.sp)
             }
-            if (isActive) Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(AccGreen))
+            if (isActive) Box(Modifier.size(8.dp).clip(CircleShape).background(AccGreen))
         }
     }
 }
@@ -536,9 +480,7 @@ private fun ServersTab(vm: VpnViewModel) {
     val state by vm.state.collectAsStateWithLifecycle()
     val s = LocalStr.current
 
-    Column(
-        modifier = Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 16.dp),
-    ) {
+    Column(Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 16.dp)) {
         Spacer(Modifier.height(16.dp))
         Text(s.tabServers, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TxtPri)
         Spacer(Modifier.height(16.dp))
@@ -546,28 +488,22 @@ private fun ServersTab(vm: VpnViewModel) {
         val isConnected = state is VpnViewModel.UiState.Connected
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedButton(
-                onClick  = { if (!isConnected) vm.refreshAndPickFastest() },
-                enabled  = !isConnected,
-                modifier = Modifier.weight(1f),
-                border   = BorderStroke(1.dp, CardBorder),
-                colors   = ButtonDefaults.outlinedButtonColors(contentColor = TxtSec),
-                shape    = RoundedCornerShape(10.dp),
+                onClick = { if (!isConnected) vm.refreshAndPickFastest() }, enabled = !isConnected,
+                modifier = Modifier.weight(1f), border = BorderStroke(1.dp, CardBorder),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = TxtSec),
+                shape = RoundedCornerShape(10.dp),
             ) {
                 Icon(Icons.Filled.Refresh, null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(s.btnRefresh)
+                Spacer(Modifier.width(6.dp)); Text(s.btnRefresh)
             }
             OutlinedButton(
-                onClick  = { if (!isConnected) vm.repingExisting() },
-                enabled  = !isConnected,
-                modifier = Modifier.weight(1f),
-                border   = BorderStroke(1.dp, CardBorder),
-                colors   = ButtonDefaults.outlinedButtonColors(contentColor = TxtSec),
-                shape    = RoundedCornerShape(10.dp),
+                onClick = { if (!isConnected) vm.repingExisting() }, enabled = !isConnected,
+                modifier = Modifier.weight(1f), border = BorderStroke(1.dp, CardBorder),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = TxtSec),
+                shape = RoundedCornerShape(10.dp),
             ) {
                 Icon(Icons.Filled.Speed, null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(s.btnTest)
+                Spacer(Modifier.width(6.dp)); Text(s.btnTest)
             }
         }
 
@@ -576,11 +512,11 @@ private fun ServersTab(vm: VpnViewModel) {
         when (val st = state) {
             is VpnViewModel.UiState.Connected -> {
                 Card(
-                    shape  = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = AccAmber.copy(0.08f)),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(AccAmber.copy(0.08f)),
                     border = BorderStroke(1.dp, AccAmber.copy(0.25f)),
                 ) {
-                    Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.Info, null, tint = AccAmber, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(s.connectedWarning, color = AccAmber, fontSize = 13.sp)
@@ -606,7 +542,7 @@ private fun ServersTab(vm: VpnViewModel) {
 @Composable
 private fun ServerRow(r: ServerPinger.Result, selected: Boolean, s: Str, onClick: () -> Unit) {
     val latColor = latencyColor(r.latencyMs, r.isReachable)
-    val bars     = signalBars(r.latencyMs, r.isReachable)
+    val bars = signalBars(r.latencyMs, r.isReachable)
 
     Box(
         modifier = Modifier
@@ -614,43 +550,31 @@ private fun ServerRow(r: ServerPinger.Result, selected: Boolean, s: Str, onClick
             .clip(RoundedCornerShape(14.dp))
             .background(
                 if (selected) Brush.horizontalGradient(listOf(AccBlue.copy(0.14f), BgCard))
-                else          Brush.horizontalGradient(listOf(BgCard, BgCard))
+                else Brush.horizontalGradient(listOf(BgCard, BgCard))
             )
-            .border(
-                if (selected) 1.dp else 0.5.dp,
-                if (selected) AccBlue.copy(0.45f) else CardBorder,
-                RoundedCornerShape(14.dp),
-            )
+            .border(if (selected) 1.dp else 0.5.dp,
+                if (selected) AccBlue.copy(0.45f) else CardBorder, RoundedCornerShape(14.dp))
             .clickable { onClick() }
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier         = Modifier.size(38.dp).clip(RoundedCornerShape(10.dp)).background(statusDotColor(r.status).copy(0.12f)),
+                Modifier.size(38.dp).clip(RoundedCornerShape(10.dp)).background(statusDotColor(r.status).copy(0.12f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(Icons.Filled.Public, null, tint = statusDotColor(r.status), modifier = Modifier.size(18.dp))
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(
-                    r.config.remark,
-                    color      = TxtPri.copy(alpha = if (selected) 1f else 0.88f),
-                    fontSize   = 14.sp,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                )
+                Text(r.config.remark,
+                    color = TxtPri.copy(if (selected) 1f else 0.88f), fontSize = 14.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium)
                 Spacer(Modifier.height(3.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        r.config.protocol.name,
-                        color      = AccBlue.copy(0.9f),
-                        fontSize   = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier   = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(AccBlue.copy(0.10f))
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                    )
+                    Text(r.config.protocol.name,
+                        color = AccBlue.copy(0.9f), fontSize = 10.sp, fontWeight = FontWeight.Medium,
+                        modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(AccBlue.copy(0.10f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp))
                     if (r.config.security != "none") {
                         Spacer(Modifier.width(4.dp))
                         Icon(Icons.Filled.Lock, null, tint = TxtSec, modifier = Modifier.size(10.dp))
@@ -662,12 +586,8 @@ private fun ServerRow(r: ServerPinger.Result, selected: Boolean, s: Str, onClick
             Column(horizontalAlignment = Alignment.End) {
                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.Bottom) {
                     (1..3).forEach { i ->
-                        Box(
-                            modifier = Modifier
-                                .width(3.dp).height((i * 5 + 3).dp)
-                                .clip(RoundedCornerShape(1.dp))
-                                .background(if (i <= bars) latColor else TxtMuted),
-                        )
+                        Box(Modifier.width(3.dp).height((i * 5 + 3).dp).clip(RoundedCornerShape(1.dp))
+                            .background(if (i <= bars) latColor else TxtMuted))
                     }
                 }
                 Spacer(Modifier.height(3.dp))
@@ -686,10 +606,8 @@ private fun PingBadge(r: ServerPinger.Result, s: Str) {
         ServerPinger.Status.UNREACHABLE -> s.pingUnreachable  to AccRed
     }
     Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(color.copy(0.15f))
-            .padding(horizontal = 10.dp, vertical = 5.dp),
+        Modifier.clip(RoundedCornerShape(8.dp)).background(color.copy(0.15f))
+            .padding(horizontal = 10.dp, vertical = 5.dp)
     ) {
         Text(text, color = color, fontWeight = FontWeight.Bold, fontSize = 12.sp)
     }
@@ -698,141 +616,130 @@ private fun PingBadge(r: ServerPinger.Result, s: Str) {
 // ─── SETTINGS TAB ────────────────────────────────────────────────────────────
 @Composable
 private fun SettingsTab(langCode: String, onLangChange: (String) -> Unit) {
-    val context = LocalContext.current
-    val scope   = rememberCoroutineScope()
-    val s       = LocalStr.current
+    val ctx   = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val s     = LocalStr.current
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .systemBarsPadding()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp),
+        Modifier.fillMaxSize().systemBarsPadding()
+            .verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
     ) {
         Spacer(Modifier.height(16.dp))
         Text(s.tabSettings, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TxtPri)
-        Spacer(Modifier.height(20.dp))
-
-        // ── Language ──────────────────────────────────────────────────────────
-        SGroup(s.grpLanguage) {
-            LangRow(Icons.Filled.Language, s.langTurkmen, "tk", langCode, onLangChange)
-            HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
-            LangRow(Icons.Filled.Language, s.langTurkish, "tr", langCode, onLangChange)
-            HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
-            LangRow(Icons.Filled.Language, s.langRussian, "ru", langCode, onLangChange)
-        }
-
         Spacer(Modifier.height(16.dp))
 
-        // ── Fragment ──────────────────────────────────────────────────────────
-        SGroup(s.grpFragment) {
-            TRow(context, scope, Icons.Filled.Shield, s.settingFragment,
+        AccGroup(s.grpLanguage, Icons.Filled.Language, defaultExpanded = false) {
+            LangRow(s.langTurkmen, "tk", langCode, onLangChange)
+            HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
+            LangRow(s.langTurkish, "tr", langCode, onLangChange)
+            HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
+            LangRow(s.langRussian, "ru", langCode, onLangChange)
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        AccGroup(s.grpFragment, Icons.Filled.Shield) {
+            TRow(ctx, scope, Icons.Filled.Shield, s.settingFragment,
                 com.seyit474.tmvpn.settings.AppSettings.FRAGMENT_ENABLED,
                 com.seyit474.tmvpn.settings.AppSettings.Defaults.FRAGMENT_ENABLED)
             HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
-            DRow(context, scope, Icons.Filled.Code, s.settingPackets,
+            DRow(ctx, scope, Icons.Filled.Code, s.settingPackets,
                 com.seyit474.tmvpn.settings.AppSettings.FRAGMENT_PACKETS,
                 com.seyit474.tmvpn.settings.AppSettings.Defaults.FRAGMENT_PACKETS,
                 listOf("tlshello", "1-3", "1-1"))
             HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
-            DRow(context, scope, Icons.Filled.LinearScale, s.settingLength,
+            DRow(ctx, scope, Icons.Filled.LinearScale, s.settingLength,
                 com.seyit474.tmvpn.settings.AppSettings.FRAGMENT_LENGTH,
                 com.seyit474.tmvpn.settings.AppSettings.Defaults.FRAGMENT_LENGTH,
                 listOf("1-3", "5-10", "10-20", "50-100", "100-200"))
             HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
-            DRow(context, scope, Icons.Filled.Timer, s.settingInterval,
+            DRow(ctx, scope, Icons.Filled.Timer, s.settingInterval,
                 com.seyit474.tmvpn.settings.AppSettings.FRAGMENT_INTERVAL,
                 com.seyit474.tmvpn.settings.AppSettings.Defaults.FRAGMENT_INTERVAL,
                 listOf("1-1", "5-10", "10-20", "20-40"))
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(10.dp))
 
-        // ── MUX ──────────────────────────────────────────────────────────────
-        SGroup(s.grpMux) {
-            TRow(context, scope, Icons.Filled.Merge, s.settingMux,
+        AccGroup(s.grpMux, Icons.Filled.Merge) {
+            TRow(ctx, scope, Icons.Filled.Merge, s.settingMux,
                 com.seyit474.tmvpn.settings.AppSettings.MUX_ENABLED,
                 com.seyit474.tmvpn.settings.AppSettings.Defaults.MUX_ENABLED)
             HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
-            DRow(context, scope, Icons.Filled.Tag, s.settingQuicMux,
+            DRow(ctx, scope, Icons.Filled.Tag, s.settingQuicMux,
                 com.seyit474.tmvpn.settings.AppSettings.MUX_XUDP_QUIC,
                 com.seyit474.tmvpn.settings.AppSettings.Defaults.MUX_XUDP_QUIC,
                 listOf("reject", "allow", "skip"))
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(10.dp))
 
-        // ── Routing ───────────────────────────────────────────────────────────
-        SGroup(s.grpRouting) {
-            TRow(context, scope, Icons.Filled.Block, s.settingUdp443,
+        AccGroup(s.grpRouting, Icons.Filled.Route) {
+            TRow(ctx, scope, Icons.Filled.Block, s.settingUdp443,
                 com.seyit474.tmvpn.settings.AppSettings.BLOCK_UDP_443,
                 com.seyit474.tmvpn.settings.AppSettings.Defaults.BLOCK_UDP_443)
             HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
-            TRow(context, scope, Icons.Filled.Search, s.settingGoogle,
+            TRow(ctx, scope, Icons.Filled.Search, s.settingGoogle,
                 com.seyit474.tmvpn.settings.AppSettings.PROXY_GOOGLE,
                 com.seyit474.tmvpn.settings.AppSettings.Defaults.PROXY_GOOGLE)
             HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
-            TRow(context, scope, Icons.Filled.Wifi, s.settingLan,
+            TRow(ctx, scope, Icons.Filled.Wifi, s.settingLan,
                 com.seyit474.tmvpn.settings.AppSettings.BYPASS_LAN,
                 com.seyit474.tmvpn.settings.AppSettings.Defaults.BYPASS_LAN)
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(10.dp))
 
-        // ── Sniffing ──────────────────────────────────────────────────────────
-        SGroup("SNIFFING") {
-            TRow(context, scope, Icons.Filled.Visibility, s.settingSniffing,
+        AccGroup("Sniffing", Icons.Filled.Visibility) {
+            TRow(ctx, scope, Icons.Filled.Visibility, s.settingSniffing,
                 com.seyit474.tmvpn.settings.AppSettings.SNIFFING_ENABLED,
                 com.seyit474.tmvpn.settings.AppSettings.Defaults.SNIFFING_ENABLED)
             HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
-            TRow(context, scope, Icons.Filled.Route, s.settingRouteOnly,
+            TRow(ctx, scope, Icons.Filled.Route, s.settingRouteOnly,
                 com.seyit474.tmvpn.settings.AppSettings.ROUTE_ONLY,
                 com.seyit474.tmvpn.settings.AppSettings.Defaults.ROUTE_ONLY)
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(10.dp))
 
-        // ── DNS ───────────────────────────────────────────────────────────────
-        SGroup(s.grpDns) {
-            DRow(context, scope, Icons.Filled.Public, s.settingRemoteDns,
+        AccGroup(s.grpDns, Icons.Filled.Dns) {
+            DRow(ctx, scope, Icons.Filled.Public, s.settingRemoteDns,
                 com.seyit474.tmvpn.settings.AppSettings.REMOTE_DNS,
                 com.seyit474.tmvpn.settings.AppSettings.Defaults.REMOTE_DNS,
                 listOf("1.1.1.1", "8.8.8.8", "9.9.9.9"))
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(10.dp))
 
-        // ── VPN ───────────────────────────────────────────────────────────────
-        SGroup(s.grpVpn) {
-            DRow(context, scope, Icons.Filled.NetworkCheck, s.settingMtu,
+        AccGroup(s.grpVpn, Icons.Filled.VpnKey) {
+            DRow(ctx, scope, Icons.Filled.NetworkCheck, s.settingMtu,
                 com.seyit474.tmvpn.settings.AppSettings.VPN_MTU,
                 com.seyit474.tmvpn.settings.AppSettings.Defaults.VPN_MTU,
                 listOf(1500, 1420, 1400, 1380))
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(10.dp))
 
-        // ── App ───────────────────────────────────────────────────────────────
-        SGroup(s.grpApp) {
-            TRow(context, scope, Icons.Filled.AutoMode, s.settingAutoSelect,
-                com.seyit474.tmvpn.settings.AppSettings.AUTO_SELECT,
-                com.seyit474.tmvpn.settings.AppSettings.Defaults.AUTO_SELECT)
+        AccGroup(s.grpApp, Icons.Filled.Apps) {
+            // AUTO_SELECT defaults to true so fastest server is always auto-selected
+            TRow(ctx, scope, Icons.Filled.AutoMode, s.settingAutoSelect,
+                com.seyit474.tmvpn.settings.AppSettings.AUTO_SELECT, true)
             HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
-            DRow(context, scope, Icons.Filled.BugReport, s.settingLogLevel,
+            DRow(ctx, scope, Icons.Filled.BugReport, s.settingLogLevel,
                 com.seyit474.tmvpn.settings.AppSettings.LOG_LEVEL,
                 com.seyit474.tmvpn.settings.AppSettings.Defaults.LOG_LEVEL,
                 listOf("warning", "info", "debug", "error"))
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(10.dp))
 
-        // ── Account ───────────────────────────────────────────────────────────
-        AccountSection(context, s)
+        AccGroup(s.grpAccount, Icons.Filled.AccountCircle) {
+            AccountContent(ctx, s)
+        }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(10.dp))
 
-        // ── About ─────────────────────────────────────────────────────────────
-        SGroup(s.grpAbout) {
+        AccGroup(s.grpAbout, Icons.Filled.Info) {
             IRow(Icons.Filled.Smartphone, s.version, "1.0.0")
             HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
             IRow(Icons.Filled.Person, s.developer, "TM Oğuz")
@@ -842,32 +749,62 @@ private fun SettingsTab(langCode: String, onLangChange: (String) -> Unit) {
     }
 }
 
+// ─── Accordion group ──────────────────────────────────────────────────────────
 @Composable
-private fun LangRow(icon: ImageVector, label: String, code: String, current: String, onChange: (String) -> Unit) {
-    Row(
-        modifier          = Modifier.fillMaxWidth().clickable { onChange(code) }.padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
+private fun AccGroup(
+    title: String,
+    icon: ImageVector,
+    defaultExpanded: Boolean = false,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    var expanded by remember { mutableStateOf(defaultExpanded) }
+    val chevron by animateFloatAsState(if (expanded) 180f else 0f, tween(200), label = "ch")
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape    = RoundedCornerShape(14.dp),
+        colors   = CardDefaults.cardColors(BgCard),
+        border   = BorderStroke(0.5.dp, if (expanded) AccBlue.copy(0.30f) else CardBorder),
     ) {
-        Icon(icon, null, tint = AccBlue, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(12.dp))
-        Text(label, color = TxtPri, fontSize = 14.sp, modifier = Modifier.weight(1f))
-        if (code == current) {
-            Icon(Icons.Filled.CheckCircle, null, tint = AccGreen, modifier = Modifier.size(20.dp))
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(icon, null, tint = if (expanded) AccBlue else TxtSec, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(title, color = TxtPri, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f))
+                Icon(Icons.Filled.ExpandMore, null,
+                    tint = if (expanded) AccBlue else TxtSec,
+                    modifier = Modifier.size(20.dp).rotate(chevron))
+            }
+            AnimatedVisibility(
+                visible = expanded,
+                enter   = expandVertically(tween(200)) + fadeIn(tween(200)),
+                exit    = shrinkVertically(tween(150)) + fadeOut(tween(150)),
+            ) {
+                Column {
+                    HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
+                    Column(content = content)
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun SGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Text(
-        title, color = TxtSec, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
-        letterSpacing = 1.sp, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
-    )
-    Card(
-        shape  = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = BgCard),
-        border = BorderStroke(0.5.dp, CardBorder),
-    ) { Column(content = content) }
+private fun LangRow(label: String, code: String, current: String, onChange: (String) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable { onChange(code) }
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = TxtPri, fontSize = 14.sp, modifier = Modifier.weight(1f))
+        if (code == current) Icon(Icons.Filled.CheckCircle, null, tint = AccGreen, modifier = Modifier.size(20.dp))
+        else Icon(Icons.Filled.RadioButtonUnchecked, null, tint = TxtMuted, modifier = Modifier.size(20.dp))
+    }
 }
 
 @Composable
@@ -880,7 +817,7 @@ private fun TRow(
     val value by com.seyit474.tmvpn.settings.AppSettings.get(context, key, default)
         .collectAsStateWithLifecycle(initialValue = default)
     Row(
-        modifier          = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth()
             .clickable { scope.launch { com.seyit474.tmvpn.settings.AppSettings.set(context, key, !value) } }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -889,13 +826,9 @@ private fun TRow(
         Spacer(Modifier.width(12.dp))
         Text(label, color = TxtPri, fontSize = 14.sp, modifier = Modifier.weight(1f))
         Switch(
-            checked         = value,
+            checked = value,
             onCheckedChange = { scope.launch { com.seyit474.tmvpn.settings.AppSettings.set(context, key, it) } },
-            colors          = SwitchDefaults.colors(
-                checkedThumbColor   = Color.White,
-                checkedTrackColor   = AccGreen,
-                uncheckedTrackColor = TxtMuted,
-            ),
+            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = AccGreen, uncheckedTrackColor = TxtMuted),
         )
     }
 }
@@ -909,38 +842,82 @@ private inline fun <reified T> DRow(
 ) {
     val value by com.seyit474.tmvpn.settings.AppSettings.get(context, key, default)
         .collectAsStateWithLifecycle(initialValue = default)
-    var expanded by remember { mutableStateOf(false) }
+    var showEdit by remember { mutableStateOf(false) }
+    var textInput by remember(value) { mutableStateOf(value.toString()) }
+    val s = LocalStr.current
 
     Row(
-        modifier          = Modifier.fillMaxWidth().clickable { expanded = !expanded }
+        modifier = Modifier.fillMaxWidth().clickable { showEdit = !showEdit }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, null, tint = AccBlue, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(12.dp))
         Text(label, color = TxtPri, fontSize = 14.sp, modifier = Modifier.weight(1f))
-        Text(value.toString(), color = AccBlue, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Text(value.toString(), color = AccBlue, fontSize = 13.sp, fontWeight = FontWeight.Medium)
         Spacer(Modifier.width(4.dp))
-        Icon(
-            if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-            null, tint = AccBlue, modifier = Modifier.size(18.dp),
-        )
+        Icon(if (showEdit) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+            null, tint = TxtSec, modifier = Modifier.size(18.dp))
     }
-    if (expanded) {
-        Column(modifier = Modifier.fillMaxWidth().background(BgDeep.copy(0.6f))) {
-            options.forEach { opt ->
-                Row(
-                    modifier          = Modifier.fillMaxWidth()
-                        .clickable { scope.launch { com.seyit474.tmvpn.settings.AppSettings.set(context, key, opt) }; expanded = false }
-                        .padding(horizontal = 36.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        if (opt == value) Icons.Filled.RadioButtonChecked else Icons.Filled.RadioButtonUnchecked,
-                        null, tint = if (opt == value) AccBlue else TxtSec, modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(opt.toString(), color = TxtPri, fontSize = 14.sp)
+
+    AnimatedVisibility(showEdit, enter = expandVertically(tween(180)) + fadeIn(tween(180)),
+        exit = shrinkVertically(tween(150)) + fadeOut(tween(150))) {
+        Column(Modifier.background(BgDeep.copy(0.7f)).padding(horizontal = 12.dp, vertical = 10.dp)) {
+            // Text field for manual input
+            OutlinedTextField(
+                value = textInput,
+                onValueChange = { textInput = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done,
+                    keyboardType = if (T::class == Int::class) KeyboardType.Number else KeyboardType.Text),
+                keyboardActions = KeyboardActions(onDone = {
+                    val parsed: T? = when {
+                        T::class == String::class -> textInput as? T
+                        T::class == Int::class    -> textInput.toIntOrNull() as? T
+                        else                      -> null
+                    }
+                    if (parsed != null) scope.launch { com.seyit474.tmvpn.settings.AppSettings.set(context, key, parsed) }
+                    showEdit = false
+                }),
+                trailingIcon = {
+                    IconButton(onClick = {
+                        val parsed: T? = when {
+                            T::class == String::class -> textInput as? T
+                            T::class == Int::class    -> textInput.toIntOrNull() as? T
+                            else                      -> null
+                        }
+                        if (parsed != null) scope.launch { com.seyit474.tmvpn.settings.AppSettings.set(context, key, parsed) }
+                        showEdit = false
+                    }) { Icon(Icons.Filled.Check, null, tint = AccGreen) }
+                },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = AccBlue, unfocusedBorderColor = CardBorder,
+                    focusedTextColor = TxtPri, unfocusedTextColor = TxtPri, cursorColor = AccBlue,
+                ),
+            )
+            Spacer(Modifier.height(8.dp))
+            // Preset chips
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                options.forEach { opt ->
+                    val isSel = opt == value
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(if (isSel) AccBlue.copy(0.20f) else BgCard)
+                            .border(1.dp, if (isSel) AccBlue.copy(0.60f) else CardBorder, RoundedCornerShape(20.dp))
+                            .clickable {
+                                scope.launch { com.seyit474.tmvpn.settings.AppSettings.set(context, key, opt) }
+                                textInput = opt.toString()
+                                showEdit = false
+                            }
+                            .padding(horizontal = 14.dp, vertical = 7.dp),
+                    ) {
+                        Text(opt.toString(), color = if (isSel) AccBlue else TxtSec, fontSize = 13.sp)
+                    }
                 }
             }
         }
@@ -950,7 +927,7 @@ private inline fun <reified T> DRow(
 @Composable
 private fun IRow(icon: ImageVector, label: String, value: String) {
     Row(
-        modifier          = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, null, tint = AccBlue, modifier = Modifier.size(20.dp))
@@ -961,46 +938,38 @@ private fun IRow(icon: ImageVector, label: String, value: String) {
 }
 
 @Composable
-private fun AccountSection(context: Context, s: Str) {
+private fun AccountContent(context: Context, s: Str) {
     val hesapId = remember { com.seyit474.tmvpn.hwid.HwidManager.getHwid(context) }
-
-    SGroup(s.grpAccount) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Box(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(BgDeep).padding(12.dp),
-            ) {
-                Column {
-                    Text(s.accountId, color = TxtSec, fontSize = 11.sp)
-                    Spacer(Modifier.height(4.dp))
-                    Text(hesapId, color = TxtPri, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
-                }
+    Column(Modifier.padding(16.dp)) {
+        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(BgDeep).padding(12.dp)) {
+            Column {
+                Text(s.accountId, color = TxtSec, fontSize = 11.sp)
+                Spacer(Modifier.height(4.dp))
+                Text(hesapId, color = TxtPri, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
             }
-            Spacer(Modifier.height(10.dp))
-            Button(
-                onClick = {
-                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    cm.setPrimaryClip(ClipData.newPlainText("id", hesapId))
-                    Toast.makeText(context, s.copied, Toast.LENGTH_SHORT).show()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors   = ButtonDefaults.buttonColors(containerColor = AccBlue, contentColor = Color.White),
-                shape    = RoundedCornerShape(10.dp),
-            ) {
-                Icon(Icons.Filled.ContentCopy, null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(s.copy, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Button(
+            onClick = {
+                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                cm.setPrimaryClip(ClipData.newPlainText("id", hesapId))
+                Toast.makeText(context, s.copied, Toast.LENGTH_SHORT).show()
+            },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(AccBlue, Color.White),
+            shape = RoundedCornerShape(10.dp),
+        ) {
+            Icon(Icons.Filled.ContentCopy, null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(s.copy, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
 
-// ─── Shared panels ───────────────────────────────────────────────────────────
+// ─── Shared panels ────────────────────────────────────────────────────────────
 @Composable
 private fun LoadingPanel(msg: String) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier            = Modifier.padding(top = 32.dp),
-    ) {
+    Column(Modifier.padding(top = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         CircularProgressIndicator(color = AccBlue, modifier = Modifier.size(28.dp), strokeWidth = 2.dp)
         Spacer(Modifier.height(12.dp))
         Text(msg, color = TxtSec, fontSize = 14.sp)
@@ -1009,22 +978,15 @@ private fun LoadingPanel(msg: String) {
 
 @Composable
 private fun ErrorPanel(msg: String, retryLabel: String, onRetry: () -> Unit) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier            = Modifier.padding(24.dp),
-    ) {
+    Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(Icons.Filled.Warning, null, tint = AccRed, modifier = Modifier.size(36.dp))
         Spacer(Modifier.height(10.dp))
         Text(msg, color = TxtSec, fontSize = 13.sp, textAlign = TextAlign.Center)
         Spacer(Modifier.height(16.dp))
-        OutlinedButton(
-            onClick = onRetry,
-            border  = BorderStroke(1.dp, AccBlue.copy(0.45f)),
-            colors  = ButtonDefaults.outlinedButtonColors(contentColor = AccBlue),
-        ) {
+        OutlinedButton(onRetry, border = BorderStroke(1.dp, AccBlue.copy(0.45f)),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = AccBlue)) {
             Icon(Icons.Filled.Refresh, null, modifier = Modifier.size(15.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(retryLabel)
+            Spacer(Modifier.width(6.dp)); Text(retryLabel)
         }
     }
 }

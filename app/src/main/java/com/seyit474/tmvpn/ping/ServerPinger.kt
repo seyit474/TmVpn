@@ -33,8 +33,15 @@ class ServerPinger(private val timeoutMs: Int = 4000) {
         configs.mapIndexed { i, cfg ->
             async(Dispatchers.IO) {
                 val r = pingOne(cfg)
-                synchronized(results) { results[i] = r }
-                onUpdate(results.toList())
+                val sorted: List<Result>
+                synchronized(results) {
+                    results[i] = r
+                    sorted = results.sortedWith(
+                        compareByDescending<Result> { it.isReachable }
+                            .thenBy { if (it.latencyMs < 0) Long.MAX_VALUE else it.latencyMs }
+                    )
+                }
+                onUpdate(sorted)
             }
         }.awaitAll()
     }
