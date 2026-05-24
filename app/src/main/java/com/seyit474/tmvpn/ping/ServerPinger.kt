@@ -66,25 +66,47 @@ class ServerPinger(private val timeoutMs: Int = 4000) {
     // ── Core ping logic ──────────────────────────────────────────────────────
 
     private suspend fun pingOne(cfg: ServerConfig): Result = withContext(Dispatchers.IO) {
-        // Pre-resolve hostname once so TCP samples don't include DNS
         val addr = resolveHost(cfg.address)
             ?: return@withContext Result(cfg, -1L, Status.UNREACHABLE)
 
-        val latency = medianTcpMs(addr, cfg.port)
-            ?: return@withContext Result(cfg, -1L, Status.UNREACHABLE)
-
-        val needsTls = cfg.security in listOf("tls", "reality") &&
-                cfg.network in listOf("tcp", "grpc", "h2", "http", "httpupgrade")
-
-        val status = if (needsTls) {
-            if (tlsHandshake(addr, cfg.port, cfg.sni ?: cfg.address)) Status.OK
-            else Status.TLS_BLOCKED
-        } else {
-            Status.OK
+        return@withContext when (cfg.security) {
+            "tls" -> {
+                // TCP + TLS handshake — most realistic, matches what users actually experience
+                val sni = cfg.sni ?: cfg.address
+                val latency = tlsHandshakeMs(addr, cfg.port, sni)
+                if (latency != null) Result(cfg, latency, Status.OK)
+                else Result(cfg, -1L, Status.TLS_BLOCKED)
+            }
+            "reality" -> {
+                // Reality rejects standard TLS — fall back to TCP only
+                val latency = medianTcpMs(addr, cfg.port)
+                    ?: return@withContext Result(cfg, -1L, Status.UNREACHABLE)
+                Result(cfg, latency, Status.OK)
+            }
+            else -> {
+                val latency = medianTcpMs(addr, cfg.port)
+                    ?: return@withContext Result(cfg, -1L, Status.UNREACHABLE)
+                Result(cfg, latency, Status.OK)
+            }
         }
-
-        Result(cfg, latency, status)
     }
+
+    // TCP + TLS handshake time — measures what users actually feel (DNS excluded)
+    private suspend fun tlsHandshakeMs(addr: InetAddress, port: Int, sni: String): Long? =
+        withTimeoutOrNull(timeoutMs.toLong()) {
+            runCatching {
+                val factory = SSLSocketFactory.getDefault() as SSLSocketFactory
+                val start = System.nanoTime()
+                (factory.createSocket(addr, port) as SSLSocket).use { ssl ->
+                    ssl.soTimeout = timeoutMs
+                    ssl.sslParameters = ssl.sslParameters.also {
+                        it.serverNames = listOf(javax.net.ssl.SNIHostName(sni))
+                    }
+                    ssl.startHandshake()
+                    (System.nanoTime() - start) / 1_000_000L
+                }
+            }.getOrNull()
+        }
 
     // 3 TCP SYN→ACK attempts; returns median in ms, null if all failed
     private suspend fun medianTcpMs(addr: InetAddress, port: Int): Long? {
@@ -92,7 +114,6 @@ class ServerPinger(private val timeoutMs: Int = 4000) {
         repeat(3) {
             val t = tcpHandshakeMs(addr, port)
             if (t != null) samples.add(t)
-            if (samples.size == 1 && it == 0) return@repeat // first success: continue for more
         }
         if (samples.isEmpty()) return null
         samples.sort()
@@ -136,19 +157,4 @@ class ServerPinger(private val timeoutMs: Int = 4000) {
             }
         }.getOrNull()
     }
-
-    private suspend fun tlsHandshake(addr: InetAddress, port: Int, sni: String): Boolean =
-        withTimeoutOrNull(timeoutMs.toLong()) {
-            runCatching {
-                val factory = SSLSocketFactory.getDefault() as SSLSocketFactory
-                (factory.createSocket(addr, port) as SSLSocket).use { ssl ->
-                    ssl.soTimeout = timeoutMs
-                    ssl.sslParameters = ssl.sslParameters.also { it.serverNames = listOf(
-                        javax.net.ssl.SNIHostName(sni)
-                    )}
-                    ssl.startHandshake()
-                    true
-                }
-            }.getOrDefault(false)
-        } ?: false
 }
