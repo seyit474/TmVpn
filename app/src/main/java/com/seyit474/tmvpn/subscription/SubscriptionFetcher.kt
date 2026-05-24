@@ -30,6 +30,20 @@ class SubscriptionFetcher(
         }
     }
 
+    suspend fun fetchWithBody(url: String): Result<Pair<String, List<ServerConfig>>> = withContext(Dispatchers.IO) {
+        runCatching {
+            val req = Request.Builder()
+                .url(url)
+                .header("User-Agent", "TmVpn/0.1")
+                .build()
+            client.newCall(req).execute().use { resp ->
+                check(resp.isSuccessful) { "HTTP ${resp.code}" }
+                val body = resp.body?.string().orEmpty()
+                Pair(body, ConfigParser.parseSubscription(body))
+            }
+        }
+    }
+
     companion object {
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)

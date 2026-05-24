@@ -19,8 +19,11 @@ import com.seyit474.tmvpn.model.ServerConfig
 import com.seyit474.tmvpn.ping.ServerPinger
 import com.seyit474.tmvpn.service.XrayConfigBuilder
 import com.seyit474.tmvpn.service.XrayVpnService
+import com.seyit474.tmvpn.subscription.ConfigParser
 import com.seyit474.tmvpn.subscription.SubscriptionFetcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.isActive
@@ -33,8 +36,13 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
     private val fetcher = SubscriptionFetcher()
     private val pinger  = ServerPinger()
 
+    private val cache by lazy {
+        getApplication<Application>().getSharedPreferences("vpn_sub_cache", Context.MODE_PRIVATE)
+    }
+
     private companion object {
         const val TAG = "VpnViewModel"
+        const val KEY_SUB_BODY = "sub_body"
 
         val KEY_FRAGMENT_ENABLED  = booleanPreferencesKey("fragment_enabled")
         val KEY_FRAGMENT_PACKETS  = stringPreferencesKey("fragment_packets")
@@ -136,6 +144,19 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
             vpnReceiver,
             IntentFilter(XrayVpnService.ACTION_STATUS),
         )
+        loadCachedServers()
+    }
+
+    private fun loadCachedServers() {
+        val body = cache.getString(KEY_SUB_BODY, null) ?: return
+        viewModelScope.launch(Dispatchers.Default) {
+            val servers = runCatching { ConfigParser.parseSubscription(body) }.getOrNull()
+            if (servers.isNullOrEmpty()) return@launch
+            val results = servers.map { ServerPinger.Result(it, -1L, ServerPinger.Status.TESTING) }
+            if (_state.value is UiState.Idle) {
+                _state.value = UiState.Ready(results, results.first().config)
+            }
+        }
     }
 
     override fun onCleared() {
@@ -176,10 +197,15 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
                 _state.value = UiState.Error("Abonelik URL'si ayarlanmamış")
                 return@launch
             }
-            _state.value = UiState.Loading
-            val list = fetcher.fetch(subUrl).getOrElse {
-                _state.value = UiState.Error("Abonelik alınamadı: ${it.message}")
+            // Only show Loading if no cached servers are already displayed
+            if (_state.value !is UiState.Ready) _state.value = UiState.Loading
+            val (rawBody, list) = fetcher.fetchWithBody(subUrl).getOrElse {
+                if (_state.value !is UiState.Ready)
+                    _state.value = UiState.Error("Abonelik alınamadı: ${it.message}")
                 return@launch
+            }
+            withContext(Dispatchers.IO) {
+                cache.edit().putString(KEY_SUB_BODY, rawBody).apply()
             }
             if (list.isEmpty()) {
                 _state.value = UiState.Error("Sunucu bulunamadı")
