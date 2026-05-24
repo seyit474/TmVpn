@@ -183,32 +183,35 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
     fun connectVpn(context: Context) {
         val cur = _state.value as? UiState.Ready ?: return
         pendingConnect = cur.selected
-        val as_ = com.seyit474.tmvpn.settings.AppSettings
-        val configJson = XrayConfigBuilder.build(
-            cur.selected,
-            hwidUuid         = com.seyit474.tmvpn.hwid.HwidManager.getHwid(context),
-            enableFragment   = as_.getSync(context, as_.FRAGMENT_ENABLED,   as_.Defaults.FRAGMENT_ENABLED),
-            fragmentPackets  = as_.getSync(context, as_.FRAGMENT_PACKETS,   as_.Defaults.FRAGMENT_PACKETS),
-            fragmentLength   = as_.getSync(context, as_.FRAGMENT_LENGTH,    as_.Defaults.FRAGMENT_LENGTH),
-            fragmentInterval = as_.getSync(context, as_.FRAGMENT_INTERVAL,  as_.Defaults.FRAGMENT_INTERVAL),
-            fragmentMaxSplit = as_.getSync(context, as_.FRAGMENT_MAX_SPLIT, as_.Defaults.FRAGMENT_MAX_SPLIT),
-            noisesEnabled    = as_.getSync(context, as_.NOISES_ENABLED,     as_.Defaults.NOISES_ENABLED),
-            noiseType        = as_.getSync(context, as_.NOISE_TYPE,         as_.Defaults.NOISE_TYPE),
-            noisePacket      = as_.getSync(context, as_.NOISE_PACKET,       as_.Defaults.NOISE_PACKET),
-            noiseDelay       = as_.getSync(context, as_.NOISE_DELAY,        as_.Defaults.NOISE_DELAY),
-            preferIpType     = as_.getSync(context, as_.PREFER_IP_TYPE,     as_.Defaults.PREFER_IP_TYPE),
-            muxEnabled       = as_.getSync(context, as_.MUX_ENABLED,        as_.Defaults.MUX_ENABLED),
-            muxConcurrency   = as_.getSync(context, as_.MUX_CONCURRENCY,    as_.Defaults.MUX_CONCURRENCY),
-            muxXudpQuic      = as_.getSync(context, as_.MUX_XUDP_QUIC,     as_.Defaults.MUX_XUDP_QUIC),
-            blockUdp443      = as_.getSync(context, as_.BLOCK_UDP_443,      as_.Defaults.BLOCK_UDP_443),
-            proxyGoogle      = as_.getSync(context, as_.PROXY_GOOGLE,       as_.Defaults.PROXY_GOOGLE),
-            bypassLan        = as_.getSync(context, as_.BYPASS_LAN,         as_.Defaults.BYPASS_LAN),
-            sniffingEnabled  = as_.getSync(context, as_.SNIFFING_ENABLED,   as_.Defaults.SNIFFING_ENABLED),
-            logLevel         = as_.getSync(context, as_.LOG_LEVEL,          as_.Defaults.LOG_LEVEL),
-            remoteDns        = as_.getSync(context, as_.REMOTE_DNS,         as_.Defaults.REMOTE_DNS),
-        )
-        XrayVpnService.start(context, configJson)
         _state.value = UiState.Connecting
+        viewModelScope.launch(Dispatchers.IO) {
+            val as_ = com.seyit474.tmvpn.settings.AppSettings
+            val prefs = as_.getAll(context)
+            val configJson = XrayConfigBuilder.build(
+                cur.selected,
+                // hwidUuid intentionally omitted — use UUID from subscription
+                enableFragment   = prefs[as_.FRAGMENT_ENABLED]   as? Boolean ?: as_.Defaults.FRAGMENT_ENABLED,
+                fragmentPackets  = prefs[as_.FRAGMENT_PACKETS]   as? String  ?: as_.Defaults.FRAGMENT_PACKETS,
+                fragmentLength   = prefs[as_.FRAGMENT_LENGTH]    as? String  ?: as_.Defaults.FRAGMENT_LENGTH,
+                fragmentInterval = prefs[as_.FRAGMENT_INTERVAL]  as? String  ?: as_.Defaults.FRAGMENT_INTERVAL,
+                fragmentMaxSplit = prefs[as_.FRAGMENT_MAX_SPLIT] as? String  ?: as_.Defaults.FRAGMENT_MAX_SPLIT,
+                noisesEnabled    = prefs[as_.NOISES_ENABLED]     as? Boolean ?: as_.Defaults.NOISES_ENABLED,
+                noiseType        = prefs[as_.NOISE_TYPE]         as? String  ?: as_.Defaults.NOISE_TYPE,
+                noisePacket      = prefs[as_.NOISE_PACKET]       as? String  ?: as_.Defaults.NOISE_PACKET,
+                noiseDelay       = prefs[as_.NOISE_DELAY]        as? String  ?: as_.Defaults.NOISE_DELAY,
+                preferIpType     = prefs[as_.PREFER_IP_TYPE]     as? String  ?: as_.Defaults.PREFER_IP_TYPE,
+                muxEnabled       = prefs[as_.MUX_ENABLED]        as? Boolean ?: as_.Defaults.MUX_ENABLED,
+                muxConcurrency   = prefs[as_.MUX_CONCURRENCY]    as? Int     ?: as_.Defaults.MUX_CONCURRENCY,
+                muxXudpQuic      = prefs[as_.MUX_XUDP_QUIC]     as? String  ?: as_.Defaults.MUX_XUDP_QUIC,
+                blockUdp443      = prefs[as_.BLOCK_UDP_443]      as? Boolean ?: as_.Defaults.BLOCK_UDP_443,
+                proxyGoogle      = prefs[as_.PROXY_GOOGLE]       as? Boolean ?: as_.Defaults.PROXY_GOOGLE,
+                bypassLan        = prefs[as_.BYPASS_LAN]         as? Boolean ?: as_.Defaults.BYPASS_LAN,
+                sniffingEnabled  = prefs[as_.SNIFFING_ENABLED]   as? Boolean ?: as_.Defaults.SNIFFING_ENABLED,
+                logLevel         = prefs[as_.LOG_LEVEL]          as? String  ?: as_.Defaults.LOG_LEVEL,
+                remoteDns        = prefs[as_.REMOTE_DNS]         as? String  ?: as_.Defaults.REMOTE_DNS,
+            )
+            XrayVpnService.start(context, configJson)
+        }
     }
 
     fun disconnectVpn(context: Context) {

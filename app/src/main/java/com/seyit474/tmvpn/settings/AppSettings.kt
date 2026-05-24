@@ -110,6 +110,9 @@ object AppSettings {
         context.dataStore.data.first()[key] ?: default
     }
 
+    suspend fun getAll(context: Context): Preferences =
+        context.dataStore.data.first()
+
     suspend fun <T> set(context: Context, key: Preferences.Key<T>, value: T) {
         context.dataStore.edit { it[key] = value }
     }
