@@ -150,7 +150,18 @@ class VpnViewModel(
     fun connectVpn(context: Context) {
         val cur = _state.value as? UiState.Ready ?: return
         pendingConnect = cur.selected
-        val configJson = XrayConfigBuilder.build(cur.selected, settings.value)
+        val s = settings.value
+        val configJson = XrayConfigBuilder.build(
+            cur.selected,
+            enableFragment   = s.fragmentEnabled,
+            fragmentPackets  = s.fragmentPackets,
+            fragmentLength   = s.fragmentLength,
+            fragmentInterval = s.fragmentInterval,
+            muxEnabled       = s.muxEnabled,
+            muxXudpQuic      = s.quicMux,
+            blockUdp443      = s.blockUdp443,
+            proxyGoogle      = s.forceGoogleProxy,
+        )
         XrayVpnService.start(context, configJson)
         _state.value = UiState.Connecting
     }
