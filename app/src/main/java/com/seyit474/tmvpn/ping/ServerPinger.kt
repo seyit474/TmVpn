@@ -2,9 +2,13 @@ package com.seyit474.tmvpn.ping
 
 import com.seyit474.tmvpn.model.ServerConfig
 import kotlinx.coroutines.*
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.net.InetAddress
 import java.net.InetSocketAddress
+import java.net.Proxy
 import java.net.Socket
+import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
 
@@ -110,6 +114,28 @@ class ServerPinger(private val timeoutMs: Int = 4000) {
         withTimeoutOrNull(timeoutMs.toLong()) {
             runCatching { InetAddress.getByName(host) }.getOrNull()
         }
+
+    // Proxy GET ping — measures real latency through the running Xray SOCKS5 tunnel
+    // Only works when VPN is connected (port 10808 open). Returns null if not available.
+    suspend fun proxyPing(
+        testUrl: String = "https://www.gstatic.com/generate_204",
+        proxyPort: Int  = 10808,
+    ): Long? = withContext(Dispatchers.IO) {
+        runCatching {
+            withTimeoutOrNull(timeoutMs.toLong()) {
+                val client = OkHttpClient.Builder()
+                    .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", proxyPort)))
+                    .connectTimeout(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
+                    .readTimeout(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
+                    .build()
+                val start = System.nanoTime()
+                val resp = client.newCall(Request.Builder().url(testUrl).head().build()).execute()
+                val ms = (System.nanoTime() - start) / 1_000_000L
+                resp.close()
+                ms
+            }
+        }.getOrNull()
+    }
 
     private suspend fun tlsHandshake(addr: InetAddress, port: Int, sni: String): Boolean =
         withTimeoutOrNull(timeoutMs.toLong()) {

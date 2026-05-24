@@ -237,15 +237,32 @@ class MainActivity : ComponentActivity() {
 
     private fun startVpnWithSelected() {
         val state = vm.state.value as? VpnViewModel.UiState.Ready ?: return
-        val cfg = state.selected
-        val fragEnabled = com.seyit474.tmvpn.settings.AppSettings.getSync(
-            this,
-            com.seyit474.tmvpn.settings.AppSettings.FRAGMENT_ENABLED,
-            com.seyit474.tmvpn.settings.AppSettings.Defaults.FRAGMENT_ENABLED,
-        )
+        val cfg  = state.selected
+        val S    = com.seyit474.tmvpn.settings.AppSettings
+        fun <T> g(k: androidx.datastore.preferences.core.Preferences.Key<T>, d: T) = S.getSync(this, k, d)
+
         val configJson = XrayConfigBuilder.build(
-            cfg, enableFragment = fragEnabled,
-            hwidUuid = com.seyit474.tmvpn.hwid.HwidManager.getHwid(this),
+            cfg,
+            enableFragment   = g(S.FRAGMENT_ENABLED,   S.Defaults.FRAGMENT_ENABLED),
+            hwidUuid         = com.seyit474.tmvpn.hwid.HwidManager.getHwid(this),
+            fragmentPackets  = g(S.FRAGMENT_PACKETS,   S.Defaults.FRAGMENT_PACKETS),
+            fragmentLength   = g(S.FRAGMENT_LENGTH,    S.Defaults.FRAGMENT_LENGTH),
+            fragmentInterval = g(S.FRAGMENT_INTERVAL,  S.Defaults.FRAGMENT_INTERVAL),
+            fragmentMaxSplit = g(S.FRAGMENT_MAX_SPLIT, S.Defaults.FRAGMENT_MAX_SPLIT),
+            noisesEnabled    = g(S.NOISES_ENABLED,     S.Defaults.NOISES_ENABLED),
+            noiseType        = g(S.NOISE_TYPE,         S.Defaults.NOISE_TYPE),
+            noisePacket      = g(S.NOISE_PACKET,       S.Defaults.NOISE_PACKET),
+            noiseDelay       = g(S.NOISE_DELAY,        S.Defaults.NOISE_DELAY),
+            preferIpType     = g(S.PREFER_IP_TYPE,     S.Defaults.PREFER_IP_TYPE),
+            muxEnabled       = g(S.MUX_ENABLED,        S.Defaults.MUX_ENABLED),
+            muxConcurrency   = g(S.MUX_CONCURRENCY,    S.Defaults.MUX_CONCURRENCY),
+            muxXudpQuic      = g(S.MUX_XUDP_QUIC,      S.Defaults.MUX_XUDP_QUIC),
+            blockUdp443      = g(S.BLOCK_UDP_443,       S.Defaults.BLOCK_UDP_443),
+            proxyGoogle      = g(S.PROXY_GOOGLE,        S.Defaults.PROXY_GOOGLE),
+            bypassLan        = g(S.BYPASS_LAN,          S.Defaults.BYPASS_LAN),
+            sniffingEnabled  = g(S.SNIFFING_ENABLED,    S.Defaults.SNIFFING_ENABLED),
+            logLevel         = g(S.LOG_LEVEL,           S.Defaults.LOG_LEVEL),
+            remoteDns        = g(S.REMOTE_DNS,          S.Defaults.REMOTE_DNS),
         )
         XrayVpnService.start(this, configJson, cfg.remark)
         vm.markConnected(cfg)
@@ -657,6 +674,11 @@ private fun SettingsTab(langCode: String, onLangChange: (String) -> Unit) {
                 com.seyit474.tmvpn.settings.AppSettings.FRAGMENT_INTERVAL,
                 com.seyit474.tmvpn.settings.AppSettings.Defaults.FRAGMENT_INTERVAL,
                 listOf("1-1", "5-10", "10-20", "20-40"))
+            HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
+            DRow(ctx, scope, Icons.Filled.ContentCut, "Max Split",
+                com.seyit474.tmvpn.settings.AppSettings.FRAGMENT_MAX_SPLIT,
+                com.seyit474.tmvpn.settings.AppSettings.Defaults.FRAGMENT_MAX_SPLIT,
+                listOf("50-100", "100-200", "200-400"))
         }
 
         Spacer(Modifier.height(10.dp))
@@ -702,6 +724,32 @@ private fun SettingsTab(langCode: String, onLangChange: (String) -> Unit) {
 
         Spacer(Modifier.height(10.dp))
 
+        Spacer(Modifier.height(10.dp))
+
+        // ── Noises ────────────────────────────────────────────────────────────
+        AccGroup("Noises", Icons.Filled.WifiTethering) {
+            TRow(ctx, scope, Icons.Filled.WifiTethering, "Noises",
+                com.seyit474.tmvpn.settings.AppSettings.NOISES_ENABLED,
+                com.seyit474.tmvpn.settings.AppSettings.Defaults.NOISES_ENABLED)
+            HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
+            DRow(ctx, scope, Icons.Filled.Category, "Tip",
+                com.seyit474.tmvpn.settings.AppSettings.NOISE_TYPE,
+                com.seyit474.tmvpn.settings.AppSettings.Defaults.NOISE_TYPE,
+                listOf("rand", "str", "base64"))
+            HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
+            DRow(ctx, scope, Icons.Filled.DataObject, "Paket",
+                com.seyit474.tmvpn.settings.AppSettings.NOISE_PACKET,
+                com.seyit474.tmvpn.settings.AppSettings.Defaults.NOISE_PACKET,
+                listOf("10-50", "50-100", "100-200"))
+            HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
+            DRow(ctx, scope, Icons.Filled.Timer, "Gecikme",
+                com.seyit474.tmvpn.settings.AppSettings.NOISE_DELAY,
+                com.seyit474.tmvpn.settings.AppSettings.Defaults.NOISE_DELAY,
+                listOf("5-10", "5-20", "10-30"))
+        }
+
+        Spacer(Modifier.height(10.dp))
+
         AccGroup(s.grpDns, Icons.Filled.Dns) {
             DRow(ctx, scope, Icons.Filled.Public, s.settingRemoteDns,
                 com.seyit474.tmvpn.settings.AppSettings.REMOTE_DNS,
@@ -716,12 +764,16 @@ private fun SettingsTab(langCode: String, onLangChange: (String) -> Unit) {
                 com.seyit474.tmvpn.settings.AppSettings.VPN_MTU,
                 com.seyit474.tmvpn.settings.AppSettings.Defaults.VPN_MTU,
                 listOf(1500, 1420, 1400, 1380))
+            HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
+            DRow(ctx, scope, Icons.Filled.Lan, "IP Türü",
+                com.seyit474.tmvpn.settings.AppSettings.PREFER_IP_TYPE,
+                com.seyit474.tmvpn.settings.AppSettings.Defaults.PREFER_IP_TYPE,
+                listOf("auto", "ipv4", "ipv6"))
         }
 
         Spacer(Modifier.height(10.dp))
 
         AccGroup(s.grpApp, Icons.Filled.Apps) {
-            // AUTO_SELECT defaults to true so fastest server is always auto-selected
             TRow(ctx, scope, Icons.Filled.AutoMode, s.settingAutoSelect,
                 com.seyit474.tmvpn.settings.AppSettings.AUTO_SELECT, true)
             HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
@@ -730,6 +782,10 @@ private fun SettingsTab(langCode: String, onLangChange: (String) -> Unit) {
                 com.seyit474.tmvpn.settings.AppSettings.Defaults.LOG_LEVEL,
                 listOf("warning", "info", "debug", "error"))
         }
+
+        Spacer(Modifier.height(10.dp))
+
+        PingSection(ctx, scope, vm)
 
         Spacer(Modifier.height(10.dp))
 
@@ -962,6 +1018,58 @@ private fun AccountContent(context: Context, s: Str) {
             Icon(Icons.Filled.ContentCopy, null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(8.dp))
             Text(s.copy, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+// ─── Ping section ─────────────────────────────────────────────────────────────
+@Composable
+private fun PingSection(context: Context, scope: CoroutineScope, vm: VpnViewModel) {
+    val state by vm.state.collectAsStateWithLifecycle()
+    val isConnected = state is VpnViewModel.UiState.Connected
+    var proxyResult by remember { mutableStateOf<String?>(null) }
+    var testing by remember { mutableStateOf(false) }
+
+    AccGroup("Ping", Icons.Filled.Speed) {
+        DRow(context, scope, Icons.Filled.NetworkPing, "Ping Türü",
+            com.seyit474.tmvpn.settings.AppSettings.PING_TYPE,
+            com.seyit474.tmvpn.settings.AppSettings.Defaults.PING_TYPE,
+            listOf("tcp", "proxy"))
+
+        if (isConnected) {
+            HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Filled.NetworkCheck, null, tint = AccBlue, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Proxy Ping", color = TxtPri, fontSize = 14.sp)
+                    proxyResult?.let { Text(it, color = AccGreen, fontSize = 12.sp) }
+                }
+                OutlinedButton(
+                    onClick = {
+                        if (!testing) {
+                            testing = true
+                            proxyResult = null
+                            scope.launch {
+                                val ms = com.seyit474.tmvpn.ping.ServerPinger().proxyPing()
+                                proxyResult = if (ms != null) "${ms}ms (generate_204)" else "Başarısız"
+                                testing = false
+                            }
+                        }
+                    },
+                    enabled = !testing,
+                    border  = BorderStroke(1.dp, AccBlue.copy(0.4f)),
+                    colors  = ButtonDefaults.outlinedButtonColors(contentColor = AccBlue),
+                    shape   = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                ) {
+                    if (testing) CircularProgressIndicator(color = AccBlue, modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                    else Text("Test", fontSize = 13.sp)
+                }
+            }
         }
     }
 }
