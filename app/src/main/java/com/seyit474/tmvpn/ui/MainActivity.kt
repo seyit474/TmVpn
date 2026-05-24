@@ -237,32 +237,33 @@ class MainActivity : ComponentActivity() {
 
     private fun startVpnWithSelected() {
         val state = vm.state.value as? VpnViewModel.UiState.Ready ?: return
-        val cfg  = state.selected
-        val S    = com.seyit474.tmvpn.settings.AppSettings
-        fun <T> g(k: androidx.datastore.preferences.core.Preferences.Key<T>, d: T) = S.getSync(this, k, d)
+        val cfg = state.selected
+        val A  = com.seyit474.tmvpn.settings.AppSettings
+        val D  = com.seyit474.tmvpn.settings.AppSettings.Defaults
+        fun <T> g(k: androidx.datastore.preferences.core.Preferences.Key<T>, d: T) = A.getSync(this, k, d)
 
         val configJson = XrayConfigBuilder.build(
             cfg,
-            enableFragment   = g(S.FRAGMENT_ENABLED,   S.Defaults.FRAGMENT_ENABLED),
+            enableFragment   = g(A.FRAGMENT_ENABLED,   D.FRAGMENT_ENABLED),
             hwidUuid         = com.seyit474.tmvpn.hwid.HwidManager.getHwid(this),
-            fragmentPackets  = g(S.FRAGMENT_PACKETS,   S.Defaults.FRAGMENT_PACKETS),
-            fragmentLength   = g(S.FRAGMENT_LENGTH,    S.Defaults.FRAGMENT_LENGTH),
-            fragmentInterval = g(S.FRAGMENT_INTERVAL,  S.Defaults.FRAGMENT_INTERVAL),
-            fragmentMaxSplit = g(S.FRAGMENT_MAX_SPLIT, S.Defaults.FRAGMENT_MAX_SPLIT),
-            noisesEnabled    = g(S.NOISES_ENABLED,     S.Defaults.NOISES_ENABLED),
-            noiseType        = g(S.NOISE_TYPE,         S.Defaults.NOISE_TYPE),
-            noisePacket      = g(S.NOISE_PACKET,       S.Defaults.NOISE_PACKET),
-            noiseDelay       = g(S.NOISE_DELAY,        S.Defaults.NOISE_DELAY),
-            preferIpType     = g(S.PREFER_IP_TYPE,     S.Defaults.PREFER_IP_TYPE),
-            muxEnabled       = g(S.MUX_ENABLED,        S.Defaults.MUX_ENABLED),
-            muxConcurrency   = g(S.MUX_CONCURRENCY,    S.Defaults.MUX_CONCURRENCY),
-            muxXudpQuic      = g(S.MUX_XUDP_QUIC,      S.Defaults.MUX_XUDP_QUIC),
-            blockUdp443      = g(S.BLOCK_UDP_443,       S.Defaults.BLOCK_UDP_443),
-            proxyGoogle      = g(S.PROXY_GOOGLE,        S.Defaults.PROXY_GOOGLE),
-            bypassLan        = g(S.BYPASS_LAN,          S.Defaults.BYPASS_LAN),
-            sniffingEnabled  = g(S.SNIFFING_ENABLED,    S.Defaults.SNIFFING_ENABLED),
-            logLevel         = g(S.LOG_LEVEL,           S.Defaults.LOG_LEVEL),
-            remoteDns        = g(S.REMOTE_DNS,          S.Defaults.REMOTE_DNS),
+            fragmentPackets  = g(A.FRAGMENT_PACKETS,   D.FRAGMENT_PACKETS),
+            fragmentLength   = g(A.FRAGMENT_LENGTH,    D.FRAGMENT_LENGTH),
+            fragmentInterval = g(A.FRAGMENT_INTERVAL,  D.FRAGMENT_INTERVAL),
+            fragmentMaxSplit = g(A.FRAGMENT_MAX_SPLIT, D.FRAGMENT_MAX_SPLIT),
+            noisesEnabled    = g(A.NOISES_ENABLED,     D.NOISES_ENABLED),
+            noiseType        = g(A.NOISE_TYPE,         D.NOISE_TYPE),
+            noisePacket      = g(A.NOISE_PACKET,       D.NOISE_PACKET),
+            noiseDelay       = g(A.NOISE_DELAY,        D.NOISE_DELAY),
+            preferIpType     = g(A.PREFER_IP_TYPE,     D.PREFER_IP_TYPE),
+            muxEnabled       = g(A.MUX_ENABLED,        D.MUX_ENABLED),
+            muxConcurrency   = g(A.MUX_CONCURRENCY,    D.MUX_CONCURRENCY),
+            muxXudpQuic      = g(A.MUX_XUDP_QUIC,      D.MUX_XUDP_QUIC),
+            blockUdp443      = g(A.BLOCK_UDP_443,       D.BLOCK_UDP_443),
+            proxyGoogle      = g(A.PROXY_GOOGLE,        D.PROXY_GOOGLE),
+            bypassLan        = g(A.BYPASS_LAN,          D.BYPASS_LAN),
+            sniffingEnabled  = g(A.SNIFFING_ENABLED,    D.SNIFFING_ENABLED),
+            logLevel         = g(A.LOG_LEVEL,           D.LOG_LEVEL),
+            remoteDns        = g(A.REMOTE_DNS,          D.REMOTE_DNS),
         )
         XrayVpnService.start(this, configJson, cfg.remark)
         vm.markConnected(cfg)
@@ -293,7 +294,7 @@ fun AppRoot(vm: VpnViewModel, langCode: String, onLangChange: (String) -> Unit, 
             when (tab) {
                 Tab.HOME     -> HomeTab(vm, onConnect)
                 Tab.SERVERS  -> ServersTab(vm)
-                Tab.SETTINGS -> SettingsTab(langCode, onLangChange)
+                Tab.SETTINGS -> SettingsTab(langCode, onLangChange, vm)
             }
         }
     }
@@ -469,6 +470,7 @@ private fun TCell(icon: ImageVector, value: String, color: Color) {
 
 @Composable
 private fun ActiveServerCard(server: com.seyit474.tmvpn.model.ServerConfig, isActive: Boolean, s: Str) {
+    val (flag, displayName) = remember(server.remark) { extractFlag(server.remark) }
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         shape = RoundedCornerShape(14.dp),
@@ -478,12 +480,16 @@ private fun ActiveServerCard(server: com.seyit474.tmvpn.model.ServerConfig, isAc
         Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(AccBlue.copy(0.12f)),
                 contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.Public, null, tint = AccBlue, modifier = Modifier.size(20.dp))
+                if (flag != null) {
+                    Text(flag, fontSize = 22.sp)
+                } else {
+                    Icon(Icons.Filled.Public, null, tint = AccBlue, modifier = Modifier.size(20.dp))
+                }
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(if (isActive) s.activeServer else s.selectedServer, color = TxtSec, fontSize = 11.sp)
-                Text(server.remark, color = TxtPri, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Text(displayName, color = TxtPri, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 Text("${server.protocol.name} • ${server.network.uppercase()}", color = TxtSec, fontSize = 12.sp)
             }
             if (isActive) Box(Modifier.size(8.dp).clip(CircleShape).background(AccGreen))
@@ -496,6 +502,25 @@ private fun ActiveServerCard(server: com.seyit474.tmvpn.model.ServerConfig, isAc
 private fun ServersTab(vm: VpnViewModel) {
     val state by vm.state.collectAsStateWithLifecycle()
     val s = LocalStr.current
+    val ctx = LocalContext.current
+    var autoSelectAfterTest by remember { mutableStateOf(false) }
+
+    // Auto-select fastest server when all pings finish
+    LaunchedEffect(state) {
+        if (autoSelectAfterTest && state is VpnViewModel.UiState.Ready) {
+            val results = (state as VpnViewModel.UiState.Ready).results
+            if (results.none { it.status == ServerPinger.Status.TESTING } && results.isNotEmpty()) {
+                val autoEnabled = com.seyit474.tmvpn.settings.AppSettings.getSync(
+                    ctx, com.seyit474.tmvpn.settings.AppSettings.AUTO_SELECT,
+                    com.seyit474.tmvpn.settings.AppSettings.Defaults.AUTO_SELECT)
+                if (autoEnabled) {
+                    val fastest = results.firstOrNull { it.isReachable }
+                    if (fastest != null) vm.selectServer(fastest.config)
+                }
+                autoSelectAfterTest = false
+            }
+        }
+    }
 
     Column(Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 16.dp)) {
         Spacer(Modifier.height(16.dp))
@@ -514,7 +539,8 @@ private fun ServersTab(vm: VpnViewModel) {
                 Spacer(Modifier.width(6.dp)); Text(s.btnRefresh)
             }
             OutlinedButton(
-                onClick = { if (!isConnected) vm.repingExisting() }, enabled = !isConnected,
+                onClick = { if (!isConnected) { autoSelectAfterTest = true; vm.repingExisting() } },
+                enabled = !isConnected,
                 modifier = Modifier.weight(1f), border = BorderStroke(1.dp, CardBorder),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = TxtSec),
                 shape = RoundedCornerShape(10.dp),
@@ -560,6 +586,7 @@ private fun ServersTab(vm: VpnViewModel) {
 private fun ServerRow(r: ServerPinger.Result, selected: Boolean, s: Str, onClick: () -> Unit) {
     val latColor = latencyColor(r.latencyMs, r.isReachable)
     val bars = signalBars(r.latencyMs, r.isReachable)
+    val (flag, displayName) = remember(r.config.remark) { extractFlag(r.config.remark) }
 
     Box(
         modifier = Modifier
@@ -579,11 +606,15 @@ private fun ServerRow(r: ServerPinger.Result, selected: Boolean, s: Str, onClick
                 Modifier.size(38.dp).clip(RoundedCornerShape(10.dp)).background(statusDotColor(r.status).copy(0.12f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.Public, null, tint = statusDotColor(r.status), modifier = Modifier.size(18.dp))
+                if (flag != null) {
+                    Text(flag, fontSize = 22.sp)
+                } else {
+                    Icon(Icons.Filled.Public, null, tint = statusDotColor(r.status), modifier = Modifier.size(18.dp))
+                }
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(r.config.remark,
+                Text(displayName,
                     color = TxtPri.copy(if (selected) 1f else 0.88f), fontSize = 14.sp,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium)
                 Spacer(Modifier.height(3.dp))
@@ -632,7 +663,7 @@ private fun PingBadge(r: ServerPinger.Result, s: Str) {
 
 // ─── SETTINGS TAB ────────────────────────────────────────────────────────────
 @Composable
-private fun SettingsTab(langCode: String, onLangChange: (String) -> Unit) {
+private fun SettingsTab(langCode: String, onLangChange: (String) -> Unit, vm: VpnViewModel) {
     val ctx   = LocalContext.current
     val scope = rememberCoroutineScope()
     val s     = LocalStr.current
@@ -1128,4 +1159,14 @@ private fun statusDotColor(s: ServerPinger.Status): Color = when (s) {
     ServerPinger.Status.TESTING     -> AccAmber
     ServerPinger.Status.TLS_BLOCKED -> AccOrange
     ServerPinger.Status.UNREACHABLE -> AccRed
+}
+
+// Returns (flagEmoji, nameWithoutFlag). Flag emoji = two regional indicator codepoints (each a surrogate pair = 4 chars).
+private fun extractFlag(name: String): Pair<String?, String> {
+    if (name.length < 4) return null to name
+    val cp1 = name.codePointAt(0)
+    if (cp1 !in 0x1F1E6..0x1F1FF) return null to name
+    val cp2 = name.codePointAt(2)
+    if (cp2 !in 0x1F1E6..0x1F1FF) return null to name
+    return name.substring(0, 4) to name.substring(4).trimStart()
 }
