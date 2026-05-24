@@ -183,18 +183,11 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
     fun connectVpn(context: Context) {
         val cur = _state.value as? UiState.Ready ?: return
         pendingConnect = cur.selected
-        val s = settings.value
+        val hwidUuid = com.seyit474.tmvpn.hwid.HwidManager.getHwid(context)
         val configJson = XrayConfigBuilder.build(
             cur.selected,
-            hwidUuid         = com.seyit474.tmvpn.hwid.HwidManager.getHwid(context),
-            enableFragment   = s.fragmentEnabled,
-            fragmentPackets  = s.fragmentPackets,
-            fragmentLength   = s.fragmentLength,
-            fragmentInterval = s.fragmentInterval,
-            muxEnabled       = s.muxEnabled,
-            muxXudpQuic      = s.quicMux,
-            blockUdp443      = s.blockUdp443,
-            proxyGoogle      = s.forceGoogleProxy,
+            enableFragment = false,
+            hwidUuid       = hwidUuid,
         )
         XrayVpnService.start(context, configJson)
         _state.value = UiState.Connecting
