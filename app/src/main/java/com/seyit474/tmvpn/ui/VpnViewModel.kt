@@ -73,6 +73,7 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     private var pendingConnect: ServerConfig? = null
+    private var lastReady: UiState.Ready? = null  // keeps last ping results in memory
 
     // ─── Traffic stats ───────────────────────────────────────────────────────
 
@@ -127,8 +128,14 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
                 XrayVpnService.EVENT_DISCONNECTED -> {
                     pendingConnect = null
                     stopTrafficMonitor()
-                    _state.value = UiState.Idle
-                    refreshAndPickFastest()
+                    // Restore last server list instantly, no re-fetch needed
+                    val last = lastReady
+                    if (last != null) {
+                        _state.value = last
+                    } else {
+                        _state.value = UiState.Idle
+                        loadCachedServers()
+                    }
                 }
                 XrayVpnService.EVENT_ERROR        -> {
                     pendingConnect = null
@@ -218,7 +225,9 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
                 _state.value = UiState.Error("Hiçbir sunucuya ulaşılamadı")
                 return@launch
             }
-            _state.value = UiState.Ready(results, fastest)
+            val ready = UiState.Ready(results, fastest)
+            lastReady = ready
+            _state.value = ready
         }
     }
 
