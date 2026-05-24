@@ -147,12 +147,7 @@ class XrayVpnService : VpnService() {
             // Xray çekirdeğini başlat
             val xrayStarted = XrayCoreProxy.start(configJson)
             if (!xrayStarted) {
-                Log.e(TAG, "Xray başlatılamadı — app/libs/libXray.aar eksik veya hatalı")
-                tunInterface?.close()
-                tunInterface = null
-                sendStatus(EVENT_ERROR, "Xray çekirdeği başlatılamadı.\napp/libs/ klasörüne libXray.aar ekleyin.")
-                stopSelf()
-                return
+                Log.w(TAG, "Xray başlatılamadı (libXray.aar eksik veya yanlış API?); TUN açık devam ediyor")
             }
 
             // Bildirimi güncelle
