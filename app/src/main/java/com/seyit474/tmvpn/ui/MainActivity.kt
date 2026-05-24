@@ -503,7 +503,16 @@ private fun ServersTab(vm: VpnViewModel) {
     val state by vm.state.collectAsStateWithLifecycle()
     val s = LocalStr.current
     val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
     var autoSelectAfterTest by remember { mutableStateOf(false) }
+
+    val pingType by com.seyit474.tmvpn.settings.AppSettings.get(
+        ctx, com.seyit474.tmvpn.settings.AppSettings.PING_TYPE,
+        com.seyit474.tmvpn.settings.AppSettings.Defaults.PING_TYPE,
+    ).collectAsStateWithLifecycle(initialValue = com.seyit474.tmvpn.settings.AppSettings.Defaults.PING_TYPE)
+
+    var proxyPingResult by remember { mutableStateOf<String?>(null) }
+    var proxyPingRunning by remember { mutableStateOf(false) }
 
     // Auto-select fastest server when all pings finish
     LaunchedEffect(state) {
@@ -528,6 +537,8 @@ private fun ServersTab(vm: VpnViewModel) {
         Spacer(Modifier.height(16.dp))
 
         val isConnected = state is VpnViewModel.UiState.Connected
+        val isProxyMode = pingType == "proxy"
+
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedButton(
                 onClick = { if (!isConnected) vm.refreshAndPickFastest() }, enabled = !isConnected,
@@ -539,14 +550,43 @@ private fun ServersTab(vm: VpnViewModel) {
                 Spacer(Modifier.width(6.dp)); Text(s.btnRefresh)
             }
             OutlinedButton(
-                onClick = { if (!isConnected) { autoSelectAfterTest = true; vm.repingExisting() } },
-                enabled = !isConnected,
+                onClick = {
+                    if (isProxyMode && isConnected) {
+                        proxyPingRunning = true
+                        proxyPingResult = null
+                        scope.launch {
+                            val ms = com.seyit474.tmvpn.ping.ServerPinger().proxyPing()
+                            proxyPingResult = if (ms != null) "${ms}ms" else "—"
+                            proxyPingRunning = false
+                        }
+                    } else if (!isConnected) {
+                        autoSelectAfterTest = true
+                        vm.repingExisting()
+                    }
+                },
+                enabled = if (isProxyMode) isConnected && !proxyPingRunning else !isConnected,
                 modifier = Modifier.weight(1f), border = BorderStroke(1.dp, CardBorder),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = TxtSec),
                 shape = RoundedCornerShape(10.dp),
             ) {
-                Icon(Icons.Filled.Speed, null, modifier = Modifier.size(16.dp))
+                if (proxyPingRunning) CircularProgressIndicator(color = AccBlue, modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                else Icon(Icons.Filled.Speed, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp)); Text(s.btnTest)
+            }
+        }
+
+        proxyPingResult?.let { result ->
+            Spacer(Modifier.height(8.dp))
+            Card(
+                shape = RoundedCornerShape(10.dp),
+                colors = CardDefaults.cardColors(AccGreen.copy(0.08f)),
+                border = BorderStroke(1.dp, AccGreen.copy(0.25f)),
+            ) {
+                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.NetworkCheck, null, tint = AccGreen, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Proxy Ping: $result", color = AccGreen, fontSize = 13.sp)
+                }
             }
         }
 
@@ -554,7 +594,7 @@ private fun ServersTab(vm: VpnViewModel) {
 
         when (val st = state) {
             is VpnViewModel.UiState.Connected -> {
-                Card(
+                if (!isProxyMode) Card(
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(AccAmber.copy(0.08f)),
                     border = BorderStroke(1.dp, AccAmber.copy(0.25f)),
@@ -926,6 +966,7 @@ private inline fun <reified T> DRow(
     icon: ImageVector, label: String,
     key: androidx.datastore.preferences.core.Preferences.Key<T>,
     default: T, options: List<T>,
+    showTextField: Boolean = true,
 ) {
     val value by com.seyit474.tmvpn.settings.AppSettings.get(context, key, default)
         .collectAsStateWithLifecycle(initialValue = default)
@@ -949,25 +990,15 @@ private inline fun <reified T> DRow(
     AnimatedVisibility(showEdit, enter = expandVertically(tween(180)) + fadeIn(tween(180)),
         exit = shrinkVertically(tween(150)) + fadeOut(tween(150))) {
         Column(Modifier.background(BgDeep.copy(0.7f)).padding(horizontal = 12.dp, vertical = 10.dp)) {
-            // Text field for manual input
-            OutlinedTextField(
-                value = textInput,
-                onValueChange = { textInput = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done,
-                    keyboardType = if (T::class == Int::class) KeyboardType.Number else KeyboardType.Text),
-                keyboardActions = KeyboardActions(onDone = {
-                    val parsed: T? = when {
-                        T::class == String::class -> textInput as? T
-                        T::class == Int::class    -> textInput.toIntOrNull() as? T
-                        else                      -> null
-                    }
-                    if (parsed != null) scope.launch { com.seyit474.tmvpn.settings.AppSettings.set(context, key, parsed) }
-                    showEdit = false
-                }),
-                trailingIcon = {
-                    IconButton(onClick = {
+            if (showTextField) {
+                OutlinedTextField(
+                    value = textInput,
+                    onValueChange = { textInput = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done,
+                        keyboardType = if (T::class == Int::class) KeyboardType.Number else KeyboardType.Text),
+                    keyboardActions = KeyboardActions(onDone = {
                         val parsed: T? = when {
                             T::class == String::class -> textInput as? T
                             T::class == Int::class    -> textInput.toIntOrNull() as? T
@@ -975,14 +1006,25 @@ private inline fun <reified T> DRow(
                         }
                         if (parsed != null) scope.launch { com.seyit474.tmvpn.settings.AppSettings.set(context, key, parsed) }
                         showEdit = false
-                    }) { Icon(Icons.Filled.Check, null, tint = AccGreen) }
-                },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AccBlue, unfocusedBorderColor = CardBorder,
-                    focusedTextColor = TxtPri, unfocusedTextColor = TxtPri, cursorColor = AccBlue,
-                ),
-            )
-            Spacer(Modifier.height(8.dp))
+                    }),
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            val parsed: T? = when {
+                                T::class == String::class -> textInput as? T
+                                T::class == Int::class    -> textInput.toIntOrNull() as? T
+                                else                      -> null
+                            }
+                            if (parsed != null) scope.launch { com.seyit474.tmvpn.settings.AppSettings.set(context, key, parsed) }
+                            showEdit = false
+                        }) { Icon(Icons.Filled.Check, null, tint = AccGreen) }
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AccBlue, unfocusedBorderColor = CardBorder,
+                        focusedTextColor = TxtPri, unfocusedTextColor = TxtPri, cursorColor = AccBlue,
+                    ),
+                )
+                Spacer(Modifier.height(8.dp))
+            }
             // Preset chips
             Row(
                 Modifier.horizontalScroll(rememberScrollState()),
@@ -1064,7 +1106,8 @@ private fun PingSection(context: Context, scope: CoroutineScope, vm: VpnViewMode
         DRow(context, scope, Icons.Filled.NetworkPing, "Ping Türü",
             com.seyit474.tmvpn.settings.AppSettings.PING_TYPE,
             com.seyit474.tmvpn.settings.AppSettings.Defaults.PING_TYPE,
-            listOf("tcp", "proxy"))
+            listOf("tcp", "proxy"),
+            showTextField = false)
 
         if (isConnected) {
             HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
