@@ -161,8 +161,13 @@ class VpnViewModel(
 
     fun refreshAndPickFastest() {
         viewModelScope.launch {
+            val subUrl = BuildConfig.SUBSCRIPTION_URL
+            if (subUrl.isBlank()) {
+                _state.value = UiState.Error("Abonelik URL'si ayarlanmamış")
+                return@launch
+            }
             _state.value = UiState.Loading
-            val list = fetcher.fetch(BuildConfig.SUBSCRIPTION_URL).getOrElse {
+            val list = fetcher.fetch(subUrl).getOrElse {
                 _state.value = UiState.Error("Abonelik alınamadı: ${it.message}")
                 return@launch
             }
