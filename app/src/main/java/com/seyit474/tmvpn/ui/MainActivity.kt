@@ -207,7 +207,7 @@ class MainActivity : ComponentActivity() {
 
     private val vpnPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
-    ) { result -> if (result.resultCode == RESULT_OK) startVpnWithSelected() }
+    ) { result -> if (result.resultCode == RESULT_OK) vm.connectVpn(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -235,46 +235,11 @@ class MainActivity : ComponentActivity() {
     private fun onConnectClicked() {
         val state = vm.state.value
         if (state is VpnViewModel.UiState.Connected) {
-            XrayVpnService.stop(this)
-            vm.markDisconnected()
+            vm.disconnectVpn(this)
             return
         }
         val intent = VpnService.prepare(this)
-        if (intent != null) vpnPermissionLauncher.launch(intent) else startVpnWithSelected()
-    }
-
-    private fun startVpnWithSelected() {
-        val state = vm.state.value as? VpnViewModel.UiState.Ready ?: return
-        val cfg = state.selected
-        val A  = com.seyit474.tmvpn.settings.AppSettings
-        val D  = com.seyit474.tmvpn.settings.AppSettings.Defaults
-        fun <T> g(k: androidx.datastore.preferences.core.Preferences.Key<T>, d: T) = A.getSync(this, k, d)
-
-        val configJson = XrayConfigBuilder.build(
-            cfg,
-            enableFragment   = g(A.FRAGMENT_ENABLED,   D.FRAGMENT_ENABLED),
-            hwidUuid         = com.seyit474.tmvpn.hwid.HwidManager.getHwid(this),
-            fragmentPackets  = g(A.FRAGMENT_PACKETS,   D.FRAGMENT_PACKETS),
-            fragmentLength   = g(A.FRAGMENT_LENGTH,    D.FRAGMENT_LENGTH),
-            fragmentInterval = g(A.FRAGMENT_INTERVAL,  D.FRAGMENT_INTERVAL),
-            fragmentMaxSplit = g(A.FRAGMENT_MAX_SPLIT, D.FRAGMENT_MAX_SPLIT),
-            noisesEnabled    = g(A.NOISES_ENABLED,     D.NOISES_ENABLED),
-            noiseType        = g(A.NOISE_TYPE,         D.NOISE_TYPE),
-            noisePacket      = g(A.NOISE_PACKET,       D.NOISE_PACKET),
-            noiseDelay       = g(A.NOISE_DELAY,        D.NOISE_DELAY),
-            preferIpType     = g(A.PREFER_IP_TYPE,     D.PREFER_IP_TYPE),
-            muxEnabled       = g(A.MUX_ENABLED,        D.MUX_ENABLED),
-            muxConcurrency   = g(A.MUX_CONCURRENCY,    D.MUX_CONCURRENCY),
-            muxXudpQuic      = g(A.MUX_XUDP_QUIC,      D.MUX_XUDP_QUIC),
-            blockUdp443      = g(A.BLOCK_UDP_443,       D.BLOCK_UDP_443),
-            proxyGoogle      = g(A.PROXY_GOOGLE,        D.PROXY_GOOGLE),
-            bypassLan        = g(A.BYPASS_LAN,          D.BYPASS_LAN),
-            sniffingEnabled  = g(A.SNIFFING_ENABLED,    D.SNIFFING_ENABLED),
-            logLevel         = g(A.LOG_LEVEL,           D.LOG_LEVEL),
-            remoteDns        = g(A.REMOTE_DNS,          D.REMOTE_DNS),
-        )
-        XrayVpnService.start(this, configJson, cfg.remark)
-        vm.markConnected(cfg)
+        if (intent != null) vpnPermissionLauncher.launch(intent) else vm.connectVpn(this)
     }
 }
 
@@ -621,7 +586,7 @@ private fun ServersTab(vm: VpnViewModel) {
                         }
                     } else if (!isConnected) {
                         autoSelectAfterTest = true
-                        vm.repingExisting()
+                        vm.refreshAndPickFastest()
                     }
                 },
                 enabled = if (isProxyMode) isConnected && !proxyPingRunning else !isConnected,
@@ -1390,6 +1355,7 @@ private fun ErrorPanel(msg: String, retryLabel: String, onRetry: () -> Unit) {
 private fun statusSubtitle(s: VpnViewModel.UiState, str: Str): String = when (s) {
     VpnViewModel.UiState.Idle         -> str.statusIdle
     VpnViewModel.UiState.Loading      -> str.loadingServers
+    VpnViewModel.UiState.Testing      -> str.loadingServers
     is VpnViewModel.UiState.Ready     -> s.selected.remark
     VpnViewModel.UiState.Connecting   -> str.statusConnecting
     is VpnViewModel.UiState.Connected -> s.server.remark
