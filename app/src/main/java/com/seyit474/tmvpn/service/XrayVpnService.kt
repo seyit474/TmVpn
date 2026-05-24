@@ -19,11 +19,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
-class XrayVpnService : VpnService(), libv2ray.V2RayVPNServiceSupportsSet {
-
-    // V2RayVPNServiceSupportsSet — socket protection so Xray outbound doesn't loop
-    override fun protect(socket: Int): Boolean = super.protect(socket)
-    override fun onEmitStatus(l: Long, status: String?): Long = 0L
+class XrayVpnService : VpnService() {
 
     private var tunInterface: ParcelFileDescriptor? = null
     private val serviceJob = SupervisorJob()
@@ -142,13 +138,7 @@ class XrayVpnService : VpnService(), libv2ray.V2RayVPNServiceSupportsSet {
 
             tunInterface = tun
 
-            // TODO: Xray'in çıkış soketini korumak için bir socket-protector callback gereklidir.
-            // AndroidLibXrayLite'ın SocketProtector arayüzünü implement eden bir nesne
-            // LibXray.setSocketProtector(protector) ile kayıt edilmeli; aksi hâlde
-            // Xray'in dış bağlantıları VPN tünelinden geçer ve döngüye (routing loop) neden olur.
-            // Şimdilik bu adım atlanmıştır — ileride XrayCoreProxy.setProtector(this) ile tamamlanacak.
-
-            // Xray çekirdeğini başlat (this = Context + V2RayVPNServiceSupportsSet)
+            // Xray çekirdeğini başlat; this (VpnService) socket protection için kullanılır
             val xrayStarted = XrayCoreProxy.start(configJson, this)
             if (!xrayStarted) {
                 Log.w(TAG, "Xray başlatılamadı; TUN açık devam ediyor")
