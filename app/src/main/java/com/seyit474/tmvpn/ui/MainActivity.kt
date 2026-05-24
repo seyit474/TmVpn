@@ -98,6 +98,8 @@ data class Str(
     val langLabel: String,
     val langTurkmen: String, val langTurkish: String, val langRussian: String,
     val confirm: String,
+    val updateCheck: String, val updateAvailable: String,
+    val updateDownloading: String, val updateInstall: String, val updateUpToDate: String,
 )
 
 private val strTr = Str(
@@ -127,6 +129,8 @@ private val strTr = Str(
     langLabel = "Dil Seçimi",
     langTurkmen = "Türkmençe", langTurkish = "Türkçe", langRussian = "Rusça",
     confirm = "Onayla",
+    updateCheck = "Güncelleme Kontrol", updateAvailable = "Güncelleme Mevcut",
+    updateDownloading = "İndiriliyor", updateInstall = "Kur", updateUpToDate = "Güncel",
 )
 
 private val strTk = Str(
@@ -156,6 +160,8 @@ private val strTk = Str(
     langLabel = "Dil saýlawy",
     langTurkmen = "Türkmençe", langTurkish = "Türkçe", langRussian = "Rusça",
     confirm = "Tassykla",
+    updateCheck = "Täzeleme barla", updateAvailable = "Täze wersiýa bar",
+    updateDownloading = "Ýüklenýär", updateInstall = "Gur", updateUpToDate = "Täze",
 )
 
 private val strRu = Str(
@@ -185,6 +191,8 @@ private val strRu = Str(
     langLabel = "Выбор языка",
     langTurkmen = "Туркменский", langTurkish = "Турецкий", langRussian = "Русский",
     confirm = "Подтвердить",
+    updateCheck = "Проверить обновление", updateAvailable = "Доступно обновление",
+    updateDownloading = "Загрузка", updateInstall = "Установить", updateUpToDate = "Актуально",
 )
 
 private val LocalStr = compositionLocalOf { strTr }
@@ -275,6 +283,58 @@ class MainActivity : ComponentActivity() {
 fun AppRoot(vm: VpnViewModel, langCode: String, onLangChange: (String) -> Unit, onConnect: () -> Unit) {
     val s = LocalStr.current
     var tab by remember { mutableStateOf(Tab.HOME) }
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var pendingUpdate by remember { mutableStateOf<com.seyit474.tmvpn.update.UpdateManager.UpdateInfo?>(null) }
+
+    // Auto-check for updates once on start
+    LaunchedEffect(Unit) {
+        pendingUpdate = com.seyit474.tmvpn.update.UpdateManager.checkUpdate()
+    }
+
+    // Update banner at top when available
+    if (pendingUpdate != null) {
+        val upd = pendingUpdate!!
+        var downloading by remember { mutableStateOf(false) }
+        var progress by remember { mutableStateOf(0) }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .background(AccGreen.copy(0.12f))
+                .border(BorderStroke(0.5.dp, AccGreen.copy(0.3f)))
+                .clickable(enabled = !downloading) {
+                    downloading = true
+                    scope.launch {
+                        val file = com.seyit474.tmvpn.update.UpdateManager.downloadApk(ctx, upd.downloadUrl) { progress = it }
+                        if (file != null) com.seyit474.tmvpn.update.UpdateManager.installApk(ctx, file)
+                        downloading = false
+                        pendingUpdate = null
+                    }
+                }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        ) {
+            if (downloading) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(color = AccGreen, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("${s.updateDownloading} %$progress", color = AccGreen, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        LinearProgressIndicator(progress = { progress / 100f }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp), color = AccGreen, trackColor = AccGreen.copy(0.2f))
+                    }
+                }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.SystemUpdate, null, tint = AccGreen, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(s.updateAvailable, color = AccGreen, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Text(upd.releaseName, color = TxtSec, fontSize = 11.sp)
+                    }
+                    Text(s.updateInstall, color = AccGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
 
     Scaffold(
         containerColor = BgDeep,
@@ -867,9 +927,11 @@ private fun SettingsTab(langCode: String, onLangChange: (String) -> Unit, vm: Vp
         Spacer(Modifier.height(10.dp))
 
         AccGroup(s.grpAbout, Icons.Filled.Info) {
-            IRow(Icons.Filled.Smartphone, s.version, "1.0.0")
+            IRow(Icons.Filled.Smartphone, s.version, "0.1.0 (build ${com.seyit474.tmvpn.BuildConfig.VERSION_CODE})")
             HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
             IRow(Icons.Filled.Person, s.developer, "TM Oğuz")
+            HorizontalDivider(color = CardBorder, thickness = 0.5.dp)
+            UpdateRow(ctx, s)
         }
 
         Spacer(Modifier.height(40.dp))
@@ -1048,6 +1110,65 @@ private inline fun <reified T> DRow(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun UpdateRow(context: Context, s: Str) {
+    val scope = rememberCoroutineScope()
+    var state by remember { mutableStateOf<String?>(null) } // null=idle, "checking", "uptodate", "downloading:N", "done"
+    var updateInfo by remember { mutableStateOf<com.seyit474.tmvpn.update.UpdateManager.UpdateInfo?>(null) }
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Filled.SystemUpdate, null, tint = AccBlue, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(s.updateCheck, color = TxtPri, fontSize = 14.sp)
+            when {
+                state == "checking"  -> Text("…", color = TxtSec, fontSize = 12.sp)
+                state == "uptodate"  -> Text(s.updateUpToDate, color = AccGreen, fontSize = 12.sp)
+                state == "done"      -> Text(s.updateInstall, color = AccGreen, fontSize = 12.sp)
+                state?.startsWith("downloading") == true -> {
+                    val pct = state!!.substringAfter(":").toIntOrNull() ?: 0
+                    Text("${s.updateDownloading} %$pct", color = AccBlue, fontSize = 12.sp)
+                    LinearProgressIndicator(progress = { pct / 100f }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp), color = AccBlue, trackColor = AccBlue.copy(0.2f))
+                }
+                updateInfo != null   -> Text(updateInfo!!.releaseName, color = AccGreen, fontSize = 12.sp)
+            }
+        }
+        when {
+            state == "checking" -> CircularProgressIndicator(color = AccBlue, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            updateInfo != null && state != "done" -> OutlinedButton(
+                onClick = {
+                    scope.launch {
+                        val file = com.seyit474.tmvpn.update.UpdateManager.downloadApk(context, updateInfo!!.downloadUrl) { state = "downloading:$it" }
+                        if (file != null) { com.seyit474.tmvpn.update.UpdateManager.installApk(context, file); state = "done" }
+                    }
+                },
+                enabled = state?.startsWith("downloading") != true,
+                border = BorderStroke(1.dp, AccGreen.copy(0.5f)),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = AccGreen),
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+            ) { Text(s.updateInstall, fontSize = 13.sp) }
+            else -> OutlinedButton(
+                onClick = {
+                    state = "checking"
+                    scope.launch {
+                        val info = com.seyit474.tmvpn.update.UpdateManager.checkUpdate()
+                        if (info != null) { updateInfo = info; state = null }
+                        else state = "uptodate"
+                    }
+                },
+                border = BorderStroke(1.dp, CardBorder),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = TxtSec),
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+            ) { Text(s.updateCheck, fontSize = 13.sp) }
         }
     }
 }

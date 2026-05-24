@@ -11,7 +11,7 @@ android {
         applicationId = "com.seyit474.tmvpn"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
+        versionCode = (project.findProperty("versionCode") as String?)?.toInt() ?: 1
         versionName = "0.1.0"
 
         // Subscription URL — GitHub Actions'ta SUBSCRIPTION_URL secret'ından gelir.
