@@ -215,7 +215,7 @@ class XrayVpnService : VpnService() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("TmVpn")
             .setContentText(text)
-            .setSmallIcon(android.R.drawable.stat_sys_vpn_ic)
+            .setSmallIcon(R.drawable.ic_vpn_notification)
             .setOngoing(true)
             .addAction(android.R.drawable.ic_delete, "Kes", stopPendingIntent)
             .build()
