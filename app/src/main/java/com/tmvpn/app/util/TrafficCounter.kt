@@ -26,21 +26,39 @@ object TrafficCounter {
     fun start() {
         stop()
         _stats.value = Stats()
+        LogBus.log("TrafficCounter", "start() cagirildi, job baslatiliyor")
         job = scope.launch {
-            // getUidRxBytes doesn't track Go/Xray sockets; use total bytes
-            val startRx = TrafficStats.getTotalRxBytes().coerceAtLeast(0)
-            val startTx = TrafficStats.getTotalTxBytes().coerceAtLeast(0)
+            val rawTotal = TrafficStats.getTotalRxBytes()
+            val rawUid   = TrafficStats.getUidRxBytes(Process.myUid())
+            LogBus.log("TrafficCounter", "getTotalRx=$rawTotal getUidRx=$rawUid")
+
+            // prefer uid-based (tracks Xray outbound), fallback to total
+            val useUid = rawUid >= 0
+            LogBus.log("TrafficCounter", "mod=${if (useUid) "uid" else "total"}")
+
+            val startRx = if (useUid) rawUid else rawTotal.coerceAtLeast(0)
+            val startTx = if (useUid)
+                TrafficStats.getUidTxBytes(Process.myUid()).coerceAtLeast(0)
+            else
+                TrafficStats.getTotalTxBytes().coerceAtLeast(0)
+
             var prevRx  = startRx
             var prevTx  = startTx
             var seconds = 0L
 
-            LogBus.log("TrafficCounter", "Basladi (mod=total)")
+            LogBus.log("TrafficCounter", "Basladi startRx=$startRx startTx=$startTx")
 
             while (isActive) {
                 delay(1_000)
                 seconds++
-                val curRx = TrafficStats.getTotalRxBytes().coerceAtLeast(0)
-                val curTx = TrafficStats.getTotalTxBytes().coerceAtLeast(0)
+                val curRx = if (useUid)
+                    TrafficStats.getUidRxBytes(Process.myUid()).coerceAtLeast(prevRx)
+                else
+                    TrafficStats.getTotalRxBytes().coerceAtLeast(prevRx)
+                val curTx = if (useUid)
+                    TrafficStats.getUidTxBytes(Process.myUid()).coerceAtLeast(prevTx)
+                else
+                    TrafficStats.getTotalTxBytes().coerceAtLeast(prevTx)
                 _stats.value = Stats(
                     connectedSeconds = seconds,
                     downloadSpeed    = (curRx - prevRx).coerceAtLeast(0),

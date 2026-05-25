@@ -28,6 +28,7 @@ class XrayVpnService : VpnService() {
     private val serviceJob = SupervisorJob()
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
     private var vpnJob: Job? = null
+    private var vpnRunning = false
 
     companion object {
         private const val TAG = "XrayVpnService"
@@ -74,7 +75,8 @@ class XrayVpnService : VpnService() {
                     return START_NOT_STICKY
                 }
                 LogBus.log(TAG, "Baslama komutu alindi, config uzunlugu=${configJson.length}")
-                LogBus.log(TAG, "CONFIG: ${configJson.take(500)}")
+                LogBus.log(TAG, "CFG-A: ${configJson.take(200)}")
+                LogBus.log(TAG, "CFG-B: ${configJson.drop(200).take(200)}")
                 startForeground(NOTIF_ID, buildNotification("Baglanylýar..."))
                 vpnJob?.cancel()
                 vpnJob = serviceScope.launch { startVpn(configJson) }
@@ -93,6 +95,7 @@ class XrayVpnService : VpnService() {
     }
 
     private fun startVpn(configJson: String) {
+        vpnRunning = true
         LogBus.log(TAG, "=== VPN baslatiliyor ===")
         sendStatus(EVENT_CONNECTING)
         try {
@@ -172,6 +175,11 @@ class XrayVpnService : VpnService() {
     }
 
     private fun stopVpn() {
+        if (!vpnRunning) {
+            LogBus.log(TAG, "stopVpn cagirildi ama zaten durdurulmus, atlaniyor")
+            return
+        }
+        vpnRunning = false
         com.tmvpn.app.util.TrafficCounter.stop()
         LogBus.log(TAG, "VPN durduruluyor...")
         try { tproxyController?.stop() } catch (_: Exception) {}
