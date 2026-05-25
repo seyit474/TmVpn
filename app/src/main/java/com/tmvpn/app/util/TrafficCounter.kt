@@ -28,7 +28,7 @@ object TrafficCounter {
         _stats.value = Stats()
         job = scope.launch {
             val uid = Process.myUid()
-            val useUid = TrafficStats.getUidRxBytes(uid) != TrafficStats.UNSUPPORTED
+            val useUid = TrafficStats.getUidRxBytes(uid) != TrafficStats.UNSUPPORTED.toLong()
 
             fun rx() = if (useUid) TrafficStats.getUidRxBytes(uid) else TrafficStats.getTotalRxBytes()
             fun tx() = if (useUid) TrafficStats.getUidTxBytes(uid) else TrafficStats.getTotalTxBytes()

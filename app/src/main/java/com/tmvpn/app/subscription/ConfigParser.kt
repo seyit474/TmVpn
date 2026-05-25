@@ -34,6 +34,8 @@ object ConfigParser {
         val params = parseQuery(uri.rawQuery ?: "")
         val remark = decodeFragment(uri.fragment) ?: "$host:$port"
 
+        val (fragEnabled, fragPackets, fragLength, fragInterval) = parseFragment(params["fragment"])
+
         return ServerConfig(
             id = stableId(link),
             remark = remark,
@@ -51,6 +53,10 @@ object ConfigParser {
             path = params["path"],
             host = params["host"],
             alpn = params["alpn"],
+            fragmentEnabled = fragEnabled,
+            fragmentPackets = fragPackets,
+            fragmentLength = fragLength,
+            fragmentInterval = fragInterval,
             raw = link
         )
     }
@@ -136,4 +142,22 @@ object ConfigParser {
 
     private fun stableId(s: String): String =
         s.hashCode().toUInt().toString(16)
+
+    // fragment param format: "length,interval,packets"  e.g. "1-3,1-1,tlshello"
+    private data class FragInfo(
+        val enabled: Boolean,
+        val packets: String,
+        val length: String,
+        val interval: String,
+    )
+
+    private fun parseFragment(raw: String?): FragInfo {
+        if (raw.isNullOrBlank()) return FragInfo(false, "tlshello", "1-3", "1-1")
+        val parts = raw.split(",").map { it.trim() }
+        return when (parts.size) {
+            3 -> FragInfo(true, parts[2], parts[0], parts[1])
+            2 -> FragInfo(true, "tlshello", parts[0], parts[1])
+            else -> FragInfo(true, "tlshello", "1-3", "1-1")
+        }
+    }
 }

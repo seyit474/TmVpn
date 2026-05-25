@@ -19,6 +19,10 @@ data class ServerConfig(
     val path: String? = null,
     val host: String? = null,
     val alpn: String? = null,
+    val fragmentEnabled: Boolean = false,
+    val fragmentPackets: String = "tlshello",
+    val fragmentLength: String = "1-3",
+    val fragmentInterval: String = "1-1",
     val raw: String
 ) {
     enum class Protocol { VLESS, VMESS, SHADOWSOCKS }

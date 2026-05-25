@@ -172,10 +172,14 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
         val cur = _state.value as? UiState.Ready ?: return
         pendingConnect = cur.selected
         val hwidUuid = com.tmvpn.app.hwid.HwidManager.getHwid(context)
+        val srv = cur.selected
         val configJson = XrayConfigBuilder.build(
-            cur.selected,
-            enableFragment = false,
-            hwidUuid       = hwidUuid,
+            srv,
+            enableFragment   = srv.fragmentEnabled,
+            hwidUuid         = hwidUuid,
+            fragmentPackets  = srv.fragmentPackets,
+            fragmentLength   = srv.fragmentLength,
+            fragmentInterval = srv.fragmentInterval,
         )
         XrayVpnService.start(context, configJson)
         _state.value = UiState.Connecting
