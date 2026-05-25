@@ -3,7 +3,7 @@ package com.tmvpn.app.update
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
-import com.tmvpn.app.BuildConfig
+import com.seyit474.tmvpn.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient

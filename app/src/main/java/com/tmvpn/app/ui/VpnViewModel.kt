@@ -13,7 +13,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import com.tmvpn.app.BuildConfig
+import com.seyit474.tmvpn.BuildConfig
 import com.tmvpn.app.model.AppSettings
 import com.tmvpn.app.model.ServerConfig
 import com.tmvpn.app.ping.ServerPinger
