@@ -19,7 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import com.tmvpn.app.R
+import com.seyit474.tmvpn.R
 import kotlinx.coroutines.delay
 
 @SuppressLint("CustomSplashScreen")

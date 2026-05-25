@@ -12,7 +12,7 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import com.tmvpn.app.R
+import com.seyit474.tmvpn.R
 import go.Seq
 import libv2ray.CoreCallbackHandler
 import libv2ray.CoreController
