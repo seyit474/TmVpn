@@ -74,6 +74,7 @@ class XrayVpnService : VpnService() {
                     return START_NOT_STICKY
                 }
                 LogBus.log(TAG, "Baslama komutu alindi, config uzunlugu=${configJson.length}")
+                LogBus.log(TAG, "CONFIG: ${configJson.take(500)}")
                 startForeground(NOTIF_ID, buildNotification("Baglanylýar..."))
                 vpnJob?.cancel()
                 vpnJob = serviceScope.launch { startVpn(configJson) }
@@ -152,6 +153,7 @@ class XrayVpnService : VpnService() {
 
             val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
             nm.notify(NOTIF_ID, buildNotification("Baglandy"))
+            com.tmvpn.app.util.TrafficCounter.start()
             sendStatus(EVENT_CONNECTED)
             LogBus.log(TAG, "=== VPN BAGLANDI ===")
 
@@ -170,6 +172,7 @@ class XrayVpnService : VpnService() {
     }
 
     private fun stopVpn() {
+        com.tmvpn.app.util.TrafficCounter.stop()
         LogBus.log(TAG, "VPN durduruluyor...")
         try { tproxyController?.stop() } catch (_: Exception) {}
         tproxyController = null
