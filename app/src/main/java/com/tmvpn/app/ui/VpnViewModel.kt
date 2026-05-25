@@ -108,14 +108,14 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
             when (event) {
                 XrayVpnService.EVENT_CONNECTING   -> _state.value = UiState.Connecting
                 XrayVpnService.EVENT_CONNECTED    -> {
-                    val cfg = pendingConnect
+                    val cfg = pendingConnect ?: lastReady?.selected
                     if (cfg != null) {
                         _state.value = UiState.Connected(cfg)
-                        startTrafficMonitor()
                     } else {
                         _state.value = UiState.Idle
                     }
                     pendingConnect = null
+                    startTrafficMonitor()
                 }
                 XrayVpnService.EVENT_DISCONNECTED -> {
                     pendingConnect = null
@@ -173,6 +173,7 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
         pendingConnect = cur.selected
         val hwidUuid = com.tmvpn.app.hwid.HwidManager.getHwid(context)
         val srv = cur.selected
+        com.tmvpn.app.util.LogBus.log(TAG, "Baglaniliyor: ${srv.remark} | ${srv.protocol} ${srv.network} | fragment=${srv.fragmentEnabled} | uuid=$hwidUuid")
         val configJson = XrayConfigBuilder.build(
             srv,
             enableFragment   = srv.fragmentEnabled,
@@ -181,6 +182,7 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
             fragmentLength   = srv.fragmentLength,
             fragmentInterval = srv.fragmentInterval,
         )
+        com.tmvpn.app.util.LogBus.log(TAG, "Config ilk 300: ${configJson.take(300)}")
         XrayVpnService.start(context, configJson)
         _state.value = UiState.Connecting
     }
