@@ -28,7 +28,7 @@ class XrayVpnService : VpnService() {
     private val serviceJob = SupervisorJob()
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
     private var vpnJob: Job? = null
-    private var vpnRunning = false
+    @Volatile private var vpnRunning = false
 
     companion object {
         private const val TAG = "XrayVpnService"

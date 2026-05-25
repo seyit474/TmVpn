@@ -247,12 +247,13 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun startTrafficMonitor() {
         com.tmvpn.app.util.TrafficCounter.start()
-        stopTrafficMonitor()
+        trafficJob?.cancel()  // sadece uid-job iptal et, TrafficCounter'i durdurma
         _traffic.value = Traffic()
         trafficJob = viewModelScope.launch {
             val uid      = Process.myUid()
             val startRx  = TrafficStats.getUidRxBytes(uid).coerceAtLeast(0)
             val startTx  = TrafficStats.getUidTxBytes(uid).coerceAtLeast(0)
+            com.tmvpn.app.util.LogBus.log(TAG, "UID trafik baslatildi uid=$uid startRx=$startRx startTx=$startTx")
             var prevRx   = startRx
             var prevTx   = startTx
             var seconds  = 0L
