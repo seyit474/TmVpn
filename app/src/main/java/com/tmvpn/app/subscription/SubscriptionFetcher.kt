@@ -15,7 +15,7 @@ class SubscriptionFetcher(
         runCatching {
             val req = Request.Builder()
                 .url(url)
-                .header("User-Agent", "TmVpn/0.1")
+                .header("User-Agent", "v2rayNG/1.8.19")
                 .build()
             client.newCall(req).execute().use { resp ->
                 check(resp.isSuccessful) { "HTTP ${resp.code}" }
@@ -29,7 +29,7 @@ class SubscriptionFetcher(
         runCatching {
             val req = Request.Builder()
                 .url(url)
-                .header("User-Agent", "TmVpn/0.1")
+                .header("User-Agent", "v2rayNG/1.8.19")
                 .build()
             client.newCall(req).execute().use { resp ->
                 check(resp.isSuccessful) { "HTTP ${resp.code}" }
