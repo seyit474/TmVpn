@@ -124,10 +124,15 @@ object ConfigParser {
     private fun decodeFragment(f: String?): String? =
         f?.let { runCatching { URLDecoder.decode(it, "UTF-8") }.getOrDefault(it) }
 
-    private fun tryBase64Decode(s: String): String? = runCatching {
-        String(Base64.decode(s, Base64.DEFAULT or Base64.URL_SAFE or Base64.NO_WRAP))
-            .takeIf { it.contains("://") }
-    }.getOrNull()
+    private fun tryBase64Decode(s: String): String? {
+        val flags = intArrayOf(Base64.DEFAULT, Base64.URL_SAFE, Base64.DEFAULT or Base64.URL_SAFE)
+        for (f in flags) {
+            runCatching {
+                String(Base64.decode(s.trim(), f)).takeIf { it.contains("://") }
+            }.getOrNull()?.let { return it }
+        }
+        return null
+    }
 
     private fun stableId(s: String): String =
         s.hashCode().toUInt().toString(16)
