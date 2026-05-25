@@ -13,6 +13,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.seyit474.tmvpn.R
+import com.tmvpn.app.util.LogBus
 import go.Seq
 import libv2ray.CoreCallbackHandler
 import libv2ray.CoreController
@@ -61,15 +62,18 @@ class XrayVpnService : VpnService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
+                LogBus.log(TAG, "Durdurma komutu alindi")
                 stopVpn()
                 stopSelf()
                 return START_NOT_STICKY
             }
             ACTION_START -> {
                 val configJson = intent.getStringExtra(EXTRA_CONFIG_JSON) ?: run {
+                    LogBus.log(TAG, "HATA: config_json yok")
                     stopSelf()
                     return START_NOT_STICKY
                 }
+                LogBus.log(TAG, "Baslama komutu alindi, config uzunlugu=${configJson.length}")
                 startForeground(NOTIF_ID, buildNotification("Baglanylýar..."))
                 vpnJob?.cancel()
                 vpnJob = serviceScope.launch { startVpn(configJson) }
@@ -88,8 +92,10 @@ class XrayVpnService : VpnService() {
     }
 
     private fun startVpn(configJson: String) {
+        LogBus.log(TAG, "=== VPN baslatiliyor ===")
         sendStatus(EVENT_CONNECTING)
         try {
+            LogBus.log(TAG, "Onceki oturum temizleniyor...")
             tproxyController?.stop()
             tproxyController = null
             try { coreController?.stopLoop() } catch (_: Exception) {}
@@ -97,6 +103,7 @@ class XrayVpnService : VpnService() {
             tunInterface?.close()
             tunInterface = null
 
+            LogBus.log(TAG, "TUN arayuzu olusturuluyor...")
             val tun = Builder()
                 .setSession("TM VPN")
                 .addAddress("10.10.10.1", 32)
@@ -106,26 +113,28 @@ class XrayVpnService : VpnService() {
                 .setMtu(1500)
                 .addDisallowedApplication(packageName)
                 .establish() ?: run {
+                    LogBus.log(TAG, "HATA: TUN arayuzu kurulamadi (izin yok?)")
                     sendStatus(EVENT_ERROR, "TUN arayüzü kurulamadı (VPN izni gerekli)")
                     stopSelf()
                     return
                 }
             tunInterface = tun
-            Log.i(TAG, "TUN fd=${tun.fd}")
+            LogBus.log(TAG, "TUN olusturuldu: fd=${tun.fd}")
 
+            LogBus.log(TAG, "Xray core baslatiliyor (SOCKS port: ${XrayConfigBuilder.SOCKS_PORT})...")
             Seq.setContext(this)
             val callback = object : CoreCallbackHandler {
                 override fun onEmitStatus(p0: Long, p1: String?): Long {
-                    Log.i(TAG, "Xray status: $p1")
+                    LogBus.log("XrayCore", "durum: $p1")
                     return 0
                 }
                 override fun shutdown(): Long {
-                    Log.i(TAG, "Xray shutdown callback")
+                    LogBus.log("XrayCore", "shutdown callback")
                     serviceScope.launch { stopVpn(); stopSelf() }
                     return 0
                 }
                 override fun startup(): Long {
-                    Log.i(TAG, "Xray startup callback")
+                    LogBus.log("XrayCore", "startup callback - hazir")
                     return 0
                 }
             }
@@ -133,20 +142,24 @@ class XrayVpnService : VpnService() {
             val controller = Libv2ray.newCoreController(callback)
             controller.startLoop(configJson, XrayConfigBuilder.SOCKS_PORT)
             coreController = controller
-            Log.i(TAG, "Xray core baslatildi (SOCKS port: ${XrayConfigBuilder.SOCKS_PORT})")
+            LogBus.log(TAG, "Xray core baslatildi OK")
 
+            LogBus.log(TAG, "TProxyController baslatiliyor...")
             val tproxy = TProxyController(this, tun, XrayConfigBuilder.SOCKS_PORT)
             tproxy.start()
             tproxyController = tproxy
-            Log.i(TAG, "hev-socks5-tunnel baslatildi")
+            LogBus.log(TAG, "TProxyController baslatildi OK")
 
             val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
             nm.notify(NOTIF_ID, buildNotification("Baglandy"))
             sendStatus(EVENT_CONNECTED)
-            Log.i(TAG, "VPN baglandí")
+            LogBus.log(TAG, "=== VPN BAGLANDI ===")
 
         } catch (e: Exception) {
-            Log.e(TAG, "VPN baslatma hatasi: ${e.message}", e)
+            val msg = "${e.javaClass.simpleName}: ${e.message}"
+            LogBus.log(TAG, "HATA: $msg")
+            e.stackTrace.take(5).forEach { LogBus.log(TAG, "  at $it") }
+            Log.e(TAG, "VPN baslatma hatasi", e)
             sendStatus(EVENT_ERROR, e.message ?: "Näbelli yalnyslyk")
             tproxyController?.stop()
             tproxyController = null
@@ -157,6 +170,7 @@ class XrayVpnService : VpnService() {
     }
 
     private fun stopVpn() {
+        LogBus.log(TAG, "VPN durduruluyor...")
         try { tproxyController?.stop() } catch (_: Exception) {}
         tproxyController = null
 
@@ -167,7 +181,7 @@ class XrayVpnService : VpnService() {
         tunInterface = null
 
         sendStatus(EVENT_DISCONNECTED)
-        Log.i(TAG, "VPN baglanysy kesildi")
+        LogBus.log(TAG, "VPN durduruldu")
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             stopForeground(STOP_FOREGROUND_REMOVE)

@@ -46,6 +46,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tmvpn.app.hwid.HwidManager
 import com.tmvpn.app.ping.ServerPinger
 import com.tmvpn.app.ui.theme.*
+import com.tmvpn.app.util.LogBus
 import com.tmvpn.app.util.TrafficCounter
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -61,7 +62,7 @@ private val TxtSec    = TextSecondary
 private val TxtMuted  = Color(0xFF4A5568)
 private val CardBrd   = GlassBorder
 
-private enum class Tab { HOME, SERVERS, SETTINGS }
+private enum class Tab { HOME, SERVERS, SETTINGS, LOGS }
 
 // ─── Activity ─────────────────────────────────────────────────────────────────
 class MainActivity : ComponentActivity() {
@@ -121,6 +122,7 @@ private fun AppRoot(vm: VpnViewModel, onConnect: () -> Unit) {
                 GlassNavItem(Icons.Filled.Home, "Baş Sahypa", tab == Tab.HOME) { tab = Tab.HOME }
                 GlassNavItem(Icons.Filled.Dns, "Serwerleri", tab == Tab.SERVERS) { tab = Tab.SERVERS }
                 GlassNavItem(Icons.Filled.Settings, "Sazlamalar", tab == Tab.SETTINGS) { tab = Tab.SETTINGS }
+                GlassNavItem(Icons.Filled.Terminal, "Log", tab == Tab.LOGS) { tab = Tab.LOGS }
             }
         },
     ) { padding ->
@@ -138,6 +140,7 @@ private fun AppRoot(vm: VpnViewModel, onConnect: () -> Unit) {
                 Tab.HOME     -> HomeScreen(vm, onConnect)
                 Tab.SERVERS  -> ServersScreen(vm)
                 Tab.SETTINGS -> SettingsScreen(vm)
+                Tab.LOGS     -> LogScreen()
             }
         }
     }
@@ -1032,4 +1035,89 @@ private fun extractFlag(name: String): Pair<String?, String> {
     val cp2 = name.codePointAt(2)
     if (cp2 !in 0x1F1E6..0x1F1FF) return null to name
     return name.substring(0, 4) to name.substring(4).trimStart()
+}
+
+// ─── LOG SCREEN ───────────────────────────────────────────────────────────────
+@Composable
+private fun LogScreen() {
+    val ctx   = LocalContext.current
+    val logs  by LogBus.logs.collectAsStateWithLifecycle()
+    val state = rememberLazyListState()
+
+    LaunchedEffect(logs.size) {
+        if (logs.isNotEmpty()) state.animateScrollToItem(logs.size - 1)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .systemBarsPadding()
+            .padding(horizontal = 16.dp),
+    ) {
+        Spacer(Modifier.height(20.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                "Log",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = TxtPri,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconButton(onClick = {
+                    val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("log", LogBus.allText()))
+                    android.widget.Toast.makeText(ctx, "Log kopyalandy", android.widget.Toast.LENGTH_SHORT).show()
+                }) {
+                    Icon(Icons.Filled.ContentCopy, null, tint = AccBlue, modifier = Modifier.size(20.dp))
+                }
+                IconButton(onClick = { LogBus.clear() }) {
+                    Icon(Icons.Filled.DeleteSweep, null, tint = AccRed, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        if (logs.isEmpty()) {
+            Box(
+                Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("Häzirlikçe log ýok", color = TxtSec, fontSize = 14.sp)
+            }
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFF060B12))
+                    .border(1.dp, GlassBorder, RoundedCornerShape(12.dp))
+                    .padding(8.dp),
+            ) {
+                LazyColumn(state = state) {
+                    items(logs) { entry ->
+                        val color = when {
+                            entry.contains("HATA") -> AccRed.copy(0.9f)
+                            entry.contains("OK") || entry.contains("BAGLANDI") -> AccGreen.copy(0.9f)
+                            entry.contains("baslatil") || entry.contains("startup") -> AccBlue.copy(0.85f)
+                            else -> TxtSec
+                        }
+                        Text(
+                            text = entry,
+                            color = color,
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            lineHeight = 16.sp,
+                            modifier = Modifier.padding(vertical = 1.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
