@@ -57,6 +57,8 @@ object ConfigParser {
             fragmentPackets = fragPackets,
             fragmentLength = fragLength,
             fragmentInterval = fragInterval,
+            xhttpMode = params["mode"],
+            xhttpExtra = params["extra"],
             raw = link
         )
     }

@@ -23,6 +23,8 @@ data class ServerConfig(
     val fragmentPackets: String = "tlshello",
     val fragmentLength: String = "1-3",
     val fragmentInterval: String = "1-1",
+    val xhttpMode: String? = null,
+    val xhttpExtra: String? = null,
     val raw: String
 ) {
     enum class Protocol { VLESS, VMESS, SHADOWSOCKS }
