@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.tmvpn.app"
+    namespace = "com.seyit474.tmvpn"
     compileSdk = 34
 
     defaultConfig {
