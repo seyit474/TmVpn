@@ -1,4 +1,4 @@
-package com.seyit474.tmvpn.ui
+package com.tmvpn.app.ui
 
 import android.app.Application
 import android.content.BroadcastReceiver
@@ -13,14 +13,14 @@ import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import com.seyit474.tmvpn.BuildConfig
-import com.seyit474.tmvpn.model.AppSettings
-import com.seyit474.tmvpn.model.ServerConfig
-import com.seyit474.tmvpn.ping.ServerPinger
-import com.seyit474.tmvpn.service.XrayConfigBuilder
-import com.seyit474.tmvpn.service.XrayVpnService
-import com.seyit474.tmvpn.subscription.ConfigParser
-import com.seyit474.tmvpn.subscription.SubscriptionFetcher
+import com.tmvpn.app.BuildConfig
+import com.tmvpn.app.model.AppSettings
+import com.tmvpn.app.model.ServerConfig
+import com.tmvpn.app.ping.ServerPinger
+import com.tmvpn.app.service.XrayConfigBuilder
+import com.tmvpn.app.service.XrayVpnService
+import com.tmvpn.app.subscription.ConfigParser
+import com.tmvpn.app.subscription.SubscriptionFetcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
@@ -54,8 +54,6 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
         val KEY_FORCE_GOOGLE      = booleanPreferencesKey("force_google_proxy")
     }
 
-    // ─── VPN state ───────────────────────────────────────────────────────────
-
     sealed interface UiState {
         data object Idle       : UiState
         data object Loading    : UiState
@@ -73,9 +71,7 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     private var pendingConnect: ServerConfig? = null
-    private var lastReady: UiState.Ready? = null  // keeps last ping results in memory
-
-    // ─── Traffic stats ───────────────────────────────────────────────────────
+    private var lastReady: UiState.Ready? = null
 
     data class Traffic(
         val elapsedSeconds:    Long = 0,
@@ -88,8 +84,6 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
     private val _traffic = MutableStateFlow(Traffic())
     val traffic: StateFlow<Traffic> = _traffic.asStateFlow()
     private var trafficJob: Job? = null
-
-    // ─── Settings ────────────────────────────────────────────────────────────
 
     val settings: StateFlow<AppSettings> = application.settingsDataStore.data
         .map { p ->
@@ -105,8 +99,6 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppSettings())
-
-    // ─── Broadcast receiver ──────────────────────────────────────────────────
 
     private val vpnReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
@@ -128,7 +120,6 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
                 XrayVpnService.EVENT_DISCONNECTED -> {
                     pendingConnect = null
                     stopTrafficMonitor()
-                    // Restore last server list instantly, no re-fetch needed
                     val last = lastReady
                     if (last != null) {
                         _state.value = last
@@ -160,7 +151,6 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
             val servers = runCatching { ConfigParser.parseSubscription(body) }.getOrNull()
             if (servers.isNullOrEmpty()) return@launch
             if (_state.value !is UiState.Idle) return@launch
-            // Show cached servers immediately, then ping in background
             val initial = servers.map { ServerPinger.Result(it, -1L, ServerPinger.Status.TESTING) }
             _state.value = UiState.Ready(initial, initial.first().config)
             pinger.pingAllStreaming(servers, this) { results ->
@@ -178,12 +168,10 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
         super.onCleared()
     }
 
-    // ─── Public API ──────────────────────────────────────────────────────────
-
     fun connectVpn(context: Context) {
         val cur = _state.value as? UiState.Ready ?: return
         pendingConnect = cur.selected
-        val hwidUuid = com.seyit474.tmvpn.hwid.HwidManager.getHwid(context)
+        val hwidUuid = com.tmvpn.app.hwid.HwidManager.getHwid(context)
         val configJson = XrayConfigBuilder.build(
             cur.selected,
             enableFragment = false,
@@ -204,26 +192,23 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
                 _state.value = UiState.Error("Abonelik URL'si ayarlanmamış")
                 return@launch
             }
-            // Only show Loading if no cached servers are already displayed
             if (_state.value !is UiState.Ready) _state.value = UiState.Loading
             val (rawBody, list) = fetcher.fetchWithBody(subUrl).getOrElse {
                 if (_state.value !is UiState.Ready)
-                    _state.value = UiState.Error("Abonelik alınamadı: ${it.message}")
+                    _state.value = UiState.Error("Serwer maglumatlary alynyp bilinmedi: ${it.message}")
                 return@launch
             }
             withContext(Dispatchers.IO) {
                 cache.edit().putString(KEY_SUB_BODY, rawBody).apply()
             }
             if (list.isEmpty()) {
-                _state.value = UiState.Error("Sunucu bulunamadı")
+                _state.value = UiState.Error("Serwer tapylmadý")
                 return@launch
             }
-            // Show all servers immediately as TESTING — list never disappears
             val testing = list.map { ServerPinger.Result(it, -1L, ServerPinger.Status.TESTING) }
             val prevSelected = (_state.value as? UiState.Ready)?.selected ?: testing.first().config
             _state.value = UiState.Ready(testing, prevSelected)
 
-            // Ping all servers with live streaming updates
             pinger.pingAllStreaming(list, this) { results ->
                 val selected = results.firstOrNull { it.isReachable }?.config ?: prevSelected
                 val ready = UiState.Ready(results, selected)
@@ -254,10 +239,8 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ─── Traffic monitor ─────────────────────────────────────────────────────
-
     private fun startTrafficMonitor() {
-        com.seyit474.tmvpn.util.TrafficCounter.start()
+        com.tmvpn.app.util.TrafficCounter.start()
         stopTrafficMonitor()
         _traffic.value = Traffic()
         trafficJob = viewModelScope.launch {
@@ -286,7 +269,7 @@ class VpnViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun stopTrafficMonitor() {
-        com.seyit474.tmvpn.util.TrafficCounter.stop()
+        com.tmvpn.app.util.TrafficCounter.stop()
         trafficJob?.cancel()
         trafficJob = null
         _traffic.value = Traffic()

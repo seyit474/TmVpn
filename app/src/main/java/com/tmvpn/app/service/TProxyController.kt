@@ -1,8 +1,8 @@
-package com.seyit474.tmvpn.service
+package com.tmvpn.app.service
 
 import android.content.Context
 import android.os.ParcelFileDescriptor
-import com.seyit474.tmvpn.util.LogBus
+import com.tmvpn.app.util.LogBus
 import hev.htproxy.TProxyService
 import java.io.File
 
@@ -20,9 +20,9 @@ class TProxyController(
         LogBus.log(TAG, "TUN fd: ${tunInterface.fd}, SOCKS port: $socksPort")
         try {
             TProxyService.TProxyStartService(configFile.absolutePath, tunInterface.fd)
-            LogBus.log(TAG, "tun2socks başlatıldı")
+            LogBus.log(TAG, "tun2socks baslatildi")
         } catch (e: Throwable) {
-            LogBus.log(TAG, "tun2socks hatası: ${e.javaClass.simpleName}: ${e.message}")
+            LogBus.log(TAG, "tun2socks hatasi: ${e.javaClass.simpleName}: ${e.message}")
             throw e
         }
     }

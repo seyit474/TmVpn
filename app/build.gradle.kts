@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.seyit474.tmvpn"
+    namespace = "com.tmvpn.app"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.seyit474.tmvpn"
+        applicationId = "com.tmvpn.app"
         minSdk = 24
         targetSdk = 34
         versionCode = (project.findProperty("versionCode") as String?)?.toInt() ?: 1

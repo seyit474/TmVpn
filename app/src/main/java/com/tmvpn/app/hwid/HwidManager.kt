@@ -1,4 +1,4 @@
-package com.seyit474.tmvpn.hwid
+package com.tmvpn.app.hwid
 
 import android.content.Context
 import android.provider.Settings

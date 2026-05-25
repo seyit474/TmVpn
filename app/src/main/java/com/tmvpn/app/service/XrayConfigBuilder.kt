@@ -1,6 +1,6 @@
-package com.seyit474.tmvpn.service
+package com.tmvpn.app.service
 
-import com.seyit474.tmvpn.model.ServerConfig
+import com.tmvpn.app.model.ServerConfig
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -41,8 +41,6 @@ object XrayConfigBuilder {
         put("dns",       dns(remoteDns))
     }.toString(2)
 
-    // ── inbounds ──────────────────────────────────────────────────────────────
-
     private fun inbounds(sniffingEnabled: Boolean) = JSONArray().apply {
         put(JSONObject().apply {
             put("tag", "socks-in"); put("port", SOCKS_PORT)
@@ -61,8 +59,6 @@ object XrayConfigBuilder {
             })
         })
     }
-
-    // ── outbounds ─────────────────────────────────────────────────────────────
 
     private fun outbounds(
         cfg: ServerConfig, hwidUuid: String?,
@@ -133,8 +129,6 @@ object XrayConfigBuilder {
         }
     }
 
-    // ── stream settings ───────────────────────────────────────────────────────
-
     private fun streamSettings(
         cfg: ServerConfig,
         enableFragment: Boolean, fragmentPackets: String, fragmentLength: String,
@@ -189,16 +183,12 @@ object XrayConfigBuilder {
         }
     }
 
-    // ── mux ───────────────────────────────────────────────────────────────────
-
     private fun muxObj(concurrency: Int, xudpQuic: String) = JSONObject().apply {
         put("enabled", true)
         put("concurrency", concurrency)
         put("xudpConcurrency", concurrency * 2)
         put("xudpProxyUDP443", xudpQuic)
     }
-
-    // ── noises ────────────────────────────────────────────────────────────────
 
     private fun noiseArray(type: String, packet: String, delay: String) = JSONArray().apply {
         put(JSONObject().apply {
@@ -207,8 +197,6 @@ object XrayConfigBuilder {
             put("delay",  delay)
         })
     }
-
-    // ── routing ───────────────────────────────────────────────────────────────
 
     private fun routing(
         blockUdp443: Boolean,
@@ -244,8 +232,6 @@ object XrayConfigBuilder {
         domain?.let      { put("domain", JSONArray().put(it)) }
         put("outboundTag", outboundTag)
     }
-
-    // ── dns ───────────────────────────────────────────────────────────────────
 
     private fun dns(remoteDns: String) = JSONObject().apply {
         put("servers", JSONArray().apply { put(remoteDns); put("8.8.8.8") })

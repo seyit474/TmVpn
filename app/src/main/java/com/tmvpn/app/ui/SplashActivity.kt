@@ -1,4 +1,4 @@
-package com.seyit474.tmvpn.ui
+package com.tmvpn.app.ui
 
 import android.annotation.SuppressLint
 import android.content.Intent
@@ -6,24 +6,20 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.Image
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.seyit474.tmvpn.R
+import com.tmvpn.app.R
 import kotlinx.coroutines.delay
 
 @SuppressLint("CustomSplashScreen")
@@ -65,7 +61,7 @@ private fun SplashScreen(onFinished: () -> Unit) {
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    listOf(Color(0xFF0A1628), Color(0xFF0D2448), Color(0xFF070B13))
+                    listOf(Color(0xFF080D14), Color(0xFF0D1B2A), Color(0xFF080D14))
                 )
             ),
         contentAlignment = Alignment.Center,
@@ -78,7 +74,7 @@ private fun SplashScreen(onFinished: () -> Unit) {
         ) {
             Image(
                 painter = painterResource(R.drawable.logo_tmvpn),
-                contentDescription = "TmVPN Logo",
+                contentDescription = "TM VPN Logo",
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.size(220.dp),
             )

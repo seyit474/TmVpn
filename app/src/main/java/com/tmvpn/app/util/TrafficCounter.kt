@@ -1,4 +1,4 @@
-package com.seyit474.tmvpn.util
+package com.tmvpn.app.util
 
 import android.net.TrafficStats
 import android.os.Process

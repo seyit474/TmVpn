@@ -1,9 +1,9 @@
-package com.seyit474.tmvpn.update
+package com.tmvpn.app.update
 
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
-import com.seyit474.tmvpn.BuildConfig
+import com.tmvpn.app.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -14,7 +14,6 @@ import java.util.concurrent.TimeUnit
 
 object UpdateManager {
 
-    // Checks all releases including prereleases, sorted newest first
     private const val API_URL =
         "https://api.github.com/repos/seyit474/tmvpn/releases?per_page=5"
 
@@ -40,7 +39,6 @@ object UpdateManager {
                 for (j in 0 until assets.length()) {
                     val asset = assets.getJSONObject(j)
                     val name = asset.getString("name")
-                    // filename format: TmVpn-{buildNum}.apk
                     val num = Regex("TmVpn-(\\d+)\\.apk").find(name)
                         ?.groupValues?.get(1)?.toIntOrNull() ?: continue
                     if (num > BuildConfig.VERSION_CODE) {

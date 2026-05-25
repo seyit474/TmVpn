@@ -1,4 +1,4 @@
-package com.seyit474.tmvpn
+package com.tmvpn.app
 
 import android.app.Application
 

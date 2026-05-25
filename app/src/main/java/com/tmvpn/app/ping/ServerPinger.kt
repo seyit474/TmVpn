@@ -1,6 +1,6 @@
-package com.seyit474.tmvpn.ping
+package com.tmvpn.app.ping
 
-import com.seyit474.tmvpn.model.ServerConfig
+import com.tmvpn.app.model.ServerConfig
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -25,7 +25,6 @@ class ServerPinger(private val timeoutMs: Int = 4000) {
         val tlsOk: Boolean get() = status == Status.OK
     }
 
-    // Live streaming ping — calls onUpdate each time a result arrives
     fun pingAllStreaming(
         configs: List<ServerConfig>,
         scope: CoroutineScope,
@@ -50,7 +49,6 @@ class ServerPinger(private val timeoutMs: Int = 4000) {
         }.awaitAll()
     }
 
-    // Blocking all-at-once (kept for backward compat)
     suspend fun pingAll(configs: List<ServerConfig>): List<Result> = coroutineScope {
         configs.map { cfg -> async(Dispatchers.IO) { pingOne(cfg) } }
             .awaitAll()
@@ -63,19 +61,13 @@ class ServerPinger(private val timeoutMs: Int = 4000) {
     suspend fun pickFastest(configs: List<ServerConfig>): ServerConfig? =
         pingAll(configs).firstOrNull { it.isReachable }?.config
 
-    // ── Core ping logic ──────────────────────────────────────────────────────
-
     private suspend fun pingOne(cfg: ServerConfig): Result = withContext(Dispatchers.IO) {
         val addr = resolveHost(cfg.address)
             ?: return@withContext Result(cfg, -1L, Status.UNREACHABLE)
 
-        // TCP latency is always measured first — fast and always works
         val tcpLatency = medianTcpMs(addr, cfg.port)
             ?: return@withContext Result(cfg, -1L, Status.UNREACHABLE)
 
-        // For TLS servers try a real TLS handshake for more accurate latency.
-        // If standard Java SSL fails (Xray uses uTLS / custom fingerprints),
-        // fall back to TCP time and still mark OK — Xray handles TLS differently.
         val latency = if (cfg.security == "tls") {
             tlsHandshakeMs(addr, cfg.port, cfg.sni ?: cfg.address) ?: tcpLatency
         } else {
@@ -85,7 +77,6 @@ class ServerPinger(private val timeoutMs: Int = 4000) {
         Result(cfg, latency, Status.OK)
     }
 
-    // TCP + TLS handshake time — measures what users actually feel (DNS excluded)
     private suspend fun tlsHandshakeMs(addr: InetAddress, port: Int, sni: String): Long? =
         withTimeoutOrNull(timeoutMs.toLong()) {
             runCatching {
@@ -102,7 +93,6 @@ class ServerPinger(private val timeoutMs: Int = 4000) {
             }.getOrNull()
         }
 
-    // 3 TCP SYN→ACK attempts; returns median in ms, null if all failed
     private suspend fun medianTcpMs(addr: InetAddress, port: Int): Long? {
         val samples = mutableListOf<Long>()
         repeat(3) {
@@ -130,8 +120,6 @@ class ServerPinger(private val timeoutMs: Int = 4000) {
             runCatching { InetAddress.getByName(host) }.getOrNull()
         }
 
-    // Proxy GET ping — measures real latency through the running Xray SOCKS5 tunnel
-    // Only works when VPN is connected (port 10808 open). Returns null if not available.
     suspend fun proxyPing(
         testUrl: String = "https://www.gstatic.com/generate_204",
         proxyPort: Int  = 10808,

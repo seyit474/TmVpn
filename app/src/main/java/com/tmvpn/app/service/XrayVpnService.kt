@@ -1,4 +1,4 @@
-package com.seyit474.tmvpn.service
+package com.tmvpn.app.service
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -12,7 +12,7 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import com.seyit474.tmvpn.R
+import com.tmvpn.app.R
 import go.Seq
 import libv2ray.CoreCallbackHandler
 import libv2ray.CoreController
@@ -35,7 +35,7 @@ class XrayVpnService : VpnService() {
 
         const val ACTION_START = "start"
         const val ACTION_STOP = "stop"
-        const val ACTION_STATUS = "com.seyit474.tmvpn.VPN_STATUS"
+        const val ACTION_STATUS = "com.tmvpn.app.VPN_STATUS"
         const val EVENT_CONNECTING = "CONNECTING"
         const val EVENT_CONNECTED = "CONNECTED"
         const val EVENT_DISCONNECTED = "DISCONNECTED"
@@ -70,7 +70,7 @@ class XrayVpnService : VpnService() {
                     stopSelf()
                     return START_NOT_STICKY
                 }
-                startForeground(NOTIF_ID, buildNotification("Baglaniyor..."))
+                startForeground(NOTIF_ID, buildNotification("Baglanylýar..."))
                 vpnJob?.cancel()
                 vpnJob = serviceScope.launch { startVpn(configJson) }
             }
@@ -104,17 +104,16 @@ class XrayVpnService : VpnService() {
                 .addRoute("::", 0)
                 .addDnsServer("1.1.1.1")
                 .setMtu(1500)
-                .addDisallowedApplication(packageName)  // Xray'in kendi trafiği TUN'u bypass eder
+                .addDisallowedApplication(packageName)
                 .establish() ?: run {
                     sendStatus(EVENT_ERROR, "TUN arayüzü kurulamadı (VPN izni gerekli)")
                     stopSelf()
                     return
                 }
             tunInterface = tun
-            Log.i(TAG, "TUN arayüzü kuruldu, fd=${tun.fd}")
+            Log.i(TAG, "TUN fd=${tun.fd}")
 
             Seq.setContext(this)
-            val service = this
             val callback = object : CoreCallbackHandler {
                 override fun onEmitStatus(p0: Long, p1: String?): Long {
                     Log.i(TAG, "Xray status: $p1")
@@ -134,21 +133,21 @@ class XrayVpnService : VpnService() {
             val controller = Libv2ray.newCoreController(callback)
             controller.startLoop(configJson, XrayConfigBuilder.SOCKS_PORT)
             coreController = controller
-            Log.i(TAG, "Xray core başlatıldı (SOCKS port: ${XrayConfigBuilder.SOCKS_PORT})")
+            Log.i(TAG, "Xray core baslatildi (SOCKS port: ${XrayConfigBuilder.SOCKS_PORT})")
 
             val tproxy = TProxyController(this, tun, XrayConfigBuilder.SOCKS_PORT)
             tproxy.start()
             tproxyController = tproxy
-            Log.i(TAG, "hev-socks5-tunnel başlatıldı")
+            Log.i(TAG, "hev-socks5-tunnel baslatildi")
 
             val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-            nm.notify(NOTIF_ID, buildNotification("Bağlı ✓"))
+            nm.notify(NOTIF_ID, buildNotification("Baglandy"))
             sendStatus(EVENT_CONNECTED)
-            Log.i(TAG, "VPN bağlantısı kuruldu")
+            Log.i(TAG, "VPN baglandí")
 
         } catch (e: Exception) {
-            Log.e(TAG, "VPN başlatma hatası: ${e.message}", e)
-            sendStatus(EVENT_ERROR, e.message ?: "Bilinmeyen hata")
+            Log.e(TAG, "VPN baslatma hatasi: ${e.message}", e)
+            sendStatus(EVENT_ERROR, e.message ?: "Näbelli yalnyslyk")
             tproxyController?.stop()
             tproxyController = null
             tunInterface?.close()
@@ -168,7 +167,7 @@ class XrayVpnService : VpnService() {
         tunInterface = null
 
         sendStatus(EVENT_DISCONNECTED)
-        Log.i(TAG, "VPN bağlantısı kesildi")
+        Log.i(TAG, "VPN baglanysy kesildi")
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -188,7 +187,7 @@ class XrayVpnService : VpnService() {
     private fun buildNotification(text: String): Notification {
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "VPN Durumu", NotificationManager.IMPORTANCE_LOW)
+            NotificationChannel(CHANNEL_ID, "VPN Ýagdaýy", NotificationManager.IMPORTANCE_LOW)
         )
         val stopPi = PendingIntent.getService(
             this, 0,

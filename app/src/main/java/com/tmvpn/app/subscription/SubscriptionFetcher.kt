@@ -1,17 +1,12 @@
-package com.seyit474.tmvpn.subscription
+package com.tmvpn.app.subscription
 
-import com.seyit474.tmvpn.model.ServerConfig
+import com.tmvpn.app.model.ServerConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
-/**
- * Subscription URL'inden config listesini çeker.
- * doc.google.com endpoint'i Türkmenistan'da erişilebilir olduğu için
- * marzban-docs-sync sistemi bu yola yazıyor.
- */
 class SubscriptionFetcher(
     private val client: OkHttpClient = defaultClient()
 ) {
