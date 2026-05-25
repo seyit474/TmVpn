@@ -27,17 +27,25 @@ object TrafficCounter {
         stop()
         _stats.value = Stats()
         job = scope.launch {
-            val uid     = Process.myUid()
-            val startRx = TrafficStats.getUidRxBytes(uid).coerceAtLeast(0)
-            val startTx = TrafficStats.getUidTxBytes(uid).coerceAtLeast(0)
+            val uid = Process.myUid()
+            val useUid = TrafficStats.getUidRxBytes(uid) != TrafficStats.UNSUPPORTED
+
+            fun rx() = if (useUid) TrafficStats.getUidRxBytes(uid) else TrafficStats.getTotalRxBytes()
+            fun tx() = if (useUid) TrafficStats.getUidTxBytes(uid) else TrafficStats.getTotalTxBytes()
+
+            val startRx = rx().coerceAtLeast(0)
+            val startTx = tx().coerceAtLeast(0)
             var prevRx  = startRx
             var prevTx  = startTx
             var seconds = 0L
+
+            LogBus.log("TrafficCounter", "Basladi (mod=${if (useUid) "uid" else "total"})")
+
             while (isActive) {
                 delay(1_000)
                 seconds++
-                val curRx = TrafficStats.getUidRxBytes(uid).coerceAtLeast(0)
-                val curTx = TrafficStats.getUidTxBytes(uid).coerceAtLeast(0)
+                val curRx = rx().coerceAtLeast(0)
+                val curTx = tx().coerceAtLeast(0)
                 _stats.value = Stats(
                     connectedSeconds = seconds,
                     downloadSpeed    = (curRx - prevRx).coerceAtLeast(0),
