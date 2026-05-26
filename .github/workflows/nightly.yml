@@ -1,0 +1,68 @@
+name: Nightly Build
+
+on:
+  push:
+    branches:
+      - 'claude/tmvpn-android-premium-ui-Z2u7b'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v3
+
+      - name: Ensure gradlew executable
+        run: chmod +x gradlew
+
+      - name: Get build number
+        id: meta
+        run: |
+          NUM=$(git rev-list --count HEAD)
+          echo "NUM=$NUM" >> $GITHUB_OUTPUT
+          echo "SHA=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug -PversionCode=${{ steps.meta.outputs.NUM }} --no-daemon
+
+      - name: Rename APK
+        run: |
+          mkdir -p artifacts
+          cp app/build/outputs/apk/debug/app-debug.apk \
+             artifacts/TmVpn-${{ steps.meta.outputs.NUM }}.apk
+
+      - name: Delete old nightly release
+        run: gh release delete nightly --yes 2>/dev/null || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete old nightly tag
+        run: git push origin :refs/tags/nightly 2>/dev/null || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create nightly release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          name: "Nightly #${{ steps.meta.outputs.NUM }}"
+          body: |
+            Otomatik build — `${{ steps.meta.outputs.SHA }}`
+            Build numarası: **${{ steps.meta.outputs.NUM }}**
+          files: artifacts/TmVpn-${{ steps.meta.outputs.NUM }}.apk
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
