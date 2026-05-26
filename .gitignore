@@ -24,5 +24,4 @@ keystore.properties
 app/release/
 app/debug/
 
-# Büyük yerel kütüphane — setup_libs.sh ile indirilir
-app/libs/libv2ray.aar
+# app/libs/libv2ray.aar git'te takip ediliyor (54 MB, git push ile dagitilir)
