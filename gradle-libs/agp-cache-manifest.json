@@ -1,0 +1,116 @@
+{
+  "com.android.tools.build/aapt2/8.5.0-11315950": {
+    "7752af9dc0329fb834b6cbad9eba812a5bca29eb": "aapt2-8.5.0-11315950-linux.jar",
+    "6e69c39681acc904f3aa5e026c3f412e6c202b63": "aapt2-8.5.0-11315950.pom"
+  },
+  "com.android.tools.build/aapt2-proto/8.5.0-11315950": {
+    "7bec8e797b786cdfaa8f0fbe033c7b77fa48064": "aapt2-proto-8.5.0-11315950.jar",
+    "2863dc0f8aae0fe3ddebd439c21eae5fb48439b7": "aapt2-proto-8.5.0-11315950.pom",
+    "432f7a5f5e2e1d0c84f3e4056c829bcd8ac95601": "aapt2-proto-8.5.0-11315950.module"
+  },
+  "com.android.tools.build/aaptcompiler/8.5.0": {
+    "49752748de3f634505d1a0d26f06ffb6f88ab1ce": "aaptcompiler-8.5.0.pom",
+    "f6d9db27cf289f6426d4559297536e0ff1f778b9": "aaptcompiler-8.5.0.jar",
+    "d967366e17a219ac8fb3b8f426fa4552b5cf3f5e": "aaptcompiler-8.5.0.module"
+  },
+  "com.android.tools.build/apksig/8.5.0": {
+    "6ee6f282eff916d0a1f9343e78fc9d859f4d4c21": "apksig-8.5.0.pom",
+    "d51ecbc4a5b7a2c7832586a4dde18f61d92810a4": "apksig-8.5.0.jar"
+  },
+  "com.android.tools.build/apkzlib/8.5.0": {
+    "3ae5dad1ba7ef1c230de6efa23722396c2ada339": "apkzlib-8.5.0.pom",
+    "d656b52facbb301b8bdc1e40a5ae008bcf335fe9": "apkzlib-8.5.0.jar"
+  },
+  "com.android.tools.build/builder/8.5.0": {
+    "463e61abef9ae45180547b13f336cc659566e876": "builder-8.5.0.pom",
+    "9a29ae2632f052e64417c2dcd47da1ff1e58035e": "builder-8.5.0.module",
+    "b67b3f37071bee0d38a4b1e7ce5b9da9ba9ca139": "builder-8.5.0.jar"
+  },
+  "com.android.tools.build/builder-model/8.5.0": {
+    "244c41451f8ca1aa5acc1fbf4f1c558ec8a86b68": "builder-model-8.5.0.module",
+    "ce5f92dd9716ef8c5f435ea54831a992771e0f55": "builder-model-8.5.0.pom"
+  },
+  "com.android.tools.build/builder-test-api/8.5.0": {
+    "ed7e1d7d1fa995f289af2e916bcf90d677b45ca0": "builder-test-api-8.5.0.pom",
+    "d040dfcdc7697d0c332cac012cb585553807e6ac": "builder-test-api-8.5.0.module"
+  },
+  "com.android.tools.build/bundletool/1.14.0": {
+    "2fcb426b5e62cc6e879369fdbbe915bb0a43c3e1": "bundletool-1.14.0.jar",
+    "62cc91c21513f464f7de9f41b1878d6704a7a28b": "bundletool-1.14.0.pom"
+  },
+  "com.android.tools.build/bundletool/1.16.0": {
+    "6f943926fef425d059cd1e7257768ec77a398de0": "bundletool-1.16.0.pom",
+    "88e6c67d315e7d2a860bb00b1bd93914f2c4fd33": "bundletool-1.16.0.jar"
+  },
+  "com.android.tools.build/gradle/8.5.0": {
+    "85ee2d55ee74070bad4f1a36e5a7b1b1372300b3": "gradle-8.5.0.module",
+    "6213739508088918191d45f66824b05b49e996db": "gradle-8.5.0.jar",
+    "2fc81c459bf6388509aa2ed63f6d49c54bc71ab1": "gradle-8.5.0.pom"
+  },
+  "com.android.tools.build/gradle-api/8.5.0": {
+    "a60df1d3c2cb2ede60fd24f8a8af9078b0eb0d5b": "gradle-api-8.5.0.pom",
+    "556cacdea68f119d7c435dd231d6b155e8b88f07": "gradle-api-8.5.0.jar",
+    "1b37c88217e85a5f585ac0ebbd7d167cf8ee84f5": "gradle-api-8.5.0.module"
+  },
+  "com.android.tools.build/gradle-settings-api/8.5.0": {
+    "c6ec47188b27d4880186b356872d2ef3534afc1b": "gradle-settings-api-8.5.0.pom",
+    "f4a13f8ac6c82161e2c9b9df2757f42232f01244": "gradle-settings-api-8.5.0.module"
+  },
+  "com.android.tools.build/manifest-merger/31.1.4": {
+    "25b60051f65f8b40dd5f1c0487caec4e05419c3a": "manifest-merger-31.1.4.jar",
+    "5e523be915f2f5b7ccf4964ed90cb638ae3aa7fe": "manifest-merger-31.1.4.pom",
+    "90d546760948c89e7880834ff9e1243364af89ae": "manifest-merger-31.1.4.module"
+  },
+  "com.android.tools.build/manifest-merger/31.5.0": {
+    "40101edd8b37485268204455f47cfb31eefee6e2": "manifest-merger-31.5.0.module",
+    "9bc1959fb32490b4dc0c43ceedbe4bf3f77bdc4": "manifest-merger-31.5.0.pom",
+    "690c32078aec5b6c99f01756f1b329392a638bd2": "manifest-merger-31.5.0.jar"
+  },
+  "com.android.tools.build/transform-api/2.0.0-deprecated-use-gradle-api": {
+    "7d636f89a401a7603740ef05ac87f5a1e2811efe": "transform-api-2.0.0-deprecated-use-gradle-api.pom"
+  },
+  "com.android.tools/annotations/31.1.4": {
+    "aedf2e75d3f641c098c14baeade4ed51fd9fa240": "annotations-31.1.4.pom"
+  },
+  "com.android.tools/annotations/31.5.0": {
+    "40b47e7013c58a708e51d7875c5ac8b5e42abf3f": "annotations-31.5.0.pom"
+  },
+  "com.android.tools/common/31.1.4": {
+    "3e1929fc2fb1b788954287463a377758df11cb7c": "common-31.1.4.pom",
+    "a16fc0ada16e99ce3e3ad8b40348243770eccd7a": "common-31.1.4.jar"
+  },
+  "com.android.tools/common/31.5.0": {
+    "ea1d553e5e9e91d53ad967ecf64c09d374b6e276": "common-31.5.0.pom",
+    "2cbf54d0619b172e4d65e944132b1bcaf5905b0": "common-31.5.0.jar"
+  },
+  "com.android.tools/dvlib/31.1.4": {
+    "1c5d1c46c0c1a326c2425b0007ae4c66ef20fecb": "dvlib-31.1.4.pom"
+  },
+  "com.android.tools/dvlib/31.5.0": {
+    "672f2fc7c61fdb347d135befcf26c24638e8fb18": "dvlib-31.5.0.pom"
+  },
+  "com.android.tools/repository/31.1.4": {
+    "371ee5bee7cb5fbd24569a2c07944be4ee2b8ce7": "repository-31.1.4.jar",
+    "c9bb737457bd68e1a8fe305e5d430a3d38d0647a": "repository-31.1.4.pom"
+  },
+  "com.android.tools/repository/31.5.0": {
+    "4ec980c865a16f186eef5d3f171478bc3d92f551": "repository-31.5.0.pom",
+    "f9d998909029644e8f7cf78cd850138ecf7cfcfd": "repository-31.5.0.jar"
+  },
+  "com.android.tools/sdk-common/31.1.4": {
+    "a7450a5a1fc9574099f661f44dd056637de82dc6": "sdk-common-31.1.4.jar",
+    "fe8e5eb4788a5aba7fad323eab4a5d414de138fc": "sdk-common-31.1.4.pom"
+  },
+  "com.android.tools/sdk-common/31.5.0": {
+    "ef25e2fe8106a2a8677068468d6c69ab88809181": "sdk-common-31.5.0.jar",
+    "cec36b05400446217e764f0318e712df0bd91333": "sdk-common-31.5.0.pom"
+  },
+  "com.android.tools/sdklib/31.1.4": {
+    "f7d94ac95051f4bc536622fd563e3ff5c15cd49": "sdklib-31.1.4.jar",
+    "aec3f1c6526d0a41cd5ea698daf7751dada5c1b5": "sdklib-31.1.4.pom"
+  },
+  "com.android.tools/sdklib/31.5.0": {
+    "23e84e946076bda65b05422fe98fae9fef55c856": "sdklib-31.5.0.jar",
+    "25361155a74d9f23fc626a29e95bc29ce116d81f": "sdklib-31.5.0.pom"
+  }
+}
