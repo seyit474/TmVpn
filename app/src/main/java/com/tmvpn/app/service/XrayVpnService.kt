@@ -75,8 +75,25 @@ class XrayVpnService : VpnService() {
                     return START_NOT_STICKY
                 }
                 LogBus.log(TAG, "Baslama komutu alindi, config uzunlugu=${configJson.length}")
-                LogBus.log(TAG, "CFG-A: ${configJson.take(200)}")
-                LogBus.log(TAG, "CFG-B: ${configJson.drop(200).take(200)}")
+                // outbound kismi loglaniyor (sunucu, protokol, stream settings)
+                try {
+                    val j = org.json.JSONObject(configJson)
+                    val ob = j.getJSONArray("outbounds").getJSONObject(0)
+                    val ss = ob.optJSONObject("streamSettings")
+                    val net = ss?.optString("network", "?") ?: "?"
+                    val sec = ss?.optString("security", "?") ?: "?"
+                    val proto = ob.optString("protocol", "?")
+                    val addr = ob.optJSONObject("settings")
+                        ?.optJSONArray("vnext")?.optJSONObject(0)?.optString("address") ?: "?"
+                    val port = ob.optJSONObject("settings")
+                        ?.optJSONArray("vnext")?.optJSONObject(0)?.optInt("port", 0) ?: 0
+                    val sockopt = ss?.optJSONObject("sockopt")
+                    val frag = sockopt?.optJSONObject("fragment")
+                    val xhttp = ss?.optJSONObject("xhttpSettings")
+                    LogBus.log(TAG, "OUTBOUND: $proto $addr:$port net=$net sec=$sec frag=${frag != null} xhttp=$xhttp")
+                } catch (e: Exception) {
+                    LogBus.log(TAG, "CFG: ${configJson.take(400)}")
+                }
                 startForeground(NOTIF_ID, buildNotification("Baglanylýar..."))
                 vpnJob?.cancel()
                 vpnJob = serviceScope.launch { startVpn(configJson) }
