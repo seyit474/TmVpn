@@ -23,5 +23,6 @@ keystore.properties
 *.aab
 app/release/
 app/debug/
+app/build/
 
 # app/libs/libv2ray.aar git'te takip ediliyor (54 MB, git push ile dagitilir)
