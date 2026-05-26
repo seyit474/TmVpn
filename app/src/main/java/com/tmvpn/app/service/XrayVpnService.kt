@@ -159,6 +159,7 @@ class XrayVpnService : VpnService() {
             com.tmvpn.app.util.TrafficCounter.start()
             sendStatus(EVENT_CONNECTED)
             LogBus.log(TAG, "=== VPN BAGLANDI ===")
+            serviceScope.launch { delay(2_000); testSocksProxy() }
 
         } catch (e: Exception) {
             val msg = "${e.javaClass.simpleName}: ${e.message}"
@@ -199,6 +200,24 @@ class XrayVpnService : VpnService() {
         } else {
             @Suppress("DEPRECATION")
             stopForeground(true)
+        }
+    }
+
+    private fun testSocksProxy() {
+        try {
+            val proxy = java.net.Proxy(
+                java.net.Proxy.Type.SOCKS,
+                java.net.InetSocketAddress("127.0.0.1", XrayConfigBuilder.SOCKS_PORT)
+            )
+            val conn = java.net.URL("http://www.gstatic.com/generate_204")
+                .openConnection(proxy) as java.net.HttpURLConnection
+            conn.connectTimeout = 7_000
+            conn.readTimeout    = 7_000
+            val code = conn.responseCode
+            LogBus.log(TAG, "Proxy test: HTTP $code ${if (code == 204 || code == 200) "OK - VPN CALISIYOR" else "BEKLENMEDIK KOD"}")
+            conn.disconnect()
+        } catch (e: Exception) {
+            LogBus.log(TAG, "Proxy test BASARISIZ: ${e.javaClass.simpleName} - ${e.message}")
         }
     }
 

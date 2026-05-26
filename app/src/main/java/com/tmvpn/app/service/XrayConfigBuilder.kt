@@ -163,7 +163,7 @@ object XrayConfigBuilder {
             "xhttp",
             "httpupgrade" -> put("xhttpSettings", JSONObject().apply {
                 cfg.path?.let { put("path", it) }
-                cfg.host?.let { put("host", it) }
+                (cfg.host ?: cfg.sni)?.let { put("host", it) }
                 cfg.xhttpMode?.let { put("mode", it) }
                 cfg.xhttpExtra?.let { extra ->
                     runCatching { put("extra", JSONObject(extra)) }
