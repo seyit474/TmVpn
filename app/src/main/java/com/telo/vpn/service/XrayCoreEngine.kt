@@ -4,14 +4,13 @@ import android.content.Context
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import android.util.Log
-import libv2ray.CoreCallbackHandler
-import libv2ray.CoreController
-import libv2ray.Libv2ray
+import java.lang.reflect.Proxy
 import java.net.DatagramSocket
 
 /**
  * Xray-core motor soyutlaması.
  * libXray.aar app/libs/ klasörüne yerleştirildiğinde LibXrayEngine aktif edilir.
+ * Derleme sırasında libv2ray.* importu yoktur — tüm çağrılar reflection ile yapılır.
  */
 interface XrayCoreEngine {
     fun start(configJson: String, tunFd: Int): Boolean
@@ -22,14 +21,11 @@ interface XrayCoreEngine {
 
 /**
  * Gerçek motor — libXray.aar (AndroidLibXrayLite) ile çalışır.
- * startLoop(configJson, tunFd): Go core tun arayüzünü doğrudan yönetir,
- * ayrı tun2socks gerekmez.
+ * Tüm libv2ray.* çağrıları reflection üzerinden yapılır; AAR olmadan da derlenir.
  */
-class LibXrayEngine(
-    private val service: VpnService
-) : XrayCoreEngine {
+class LibXrayEngine(private val service: VpnService) : XrayCoreEngine {
 
-    private var controller: CoreController? = null
+    private var controller: Any? = null
 
     companion object {
         private const val TAG = "TeloVPN/Xray"
@@ -37,39 +33,48 @@ class LibXrayEngine(
 
         fun initEnv(context: Context) {
             if (initialized) return
-            Libv2ray.initCoreEnv(context.filesDir.absolutePath, "")
+            val libv2ray = Class.forName("libv2ray.Libv2ray")
+            libv2ray.getMethod("initCoreEnv", String::class.java, String::class.java)
+                .invoke(null, context.filesDir.absolutePath, "")
+            val checkVersion = runCatching {
+                libv2ray.getMethod("checkVersionX").invoke(null) as String
+            }.getOrDefault("?")
             initialized = true
-            Log.i(TAG, "Xray env hazır — ${Libv2ray.checkVersionX()}")
+            Log.i(TAG, "Xray env hazır — $checkVersion")
         }
     }
 
     override fun start(configJson: String, tunFd: Int): Boolean {
         return runCatching {
-            val handler = object : CoreCallbackHandler {
-                override fun startup(): Long {
-                    // Go core, VPN sunucusuna bağlanmak için bir socket oluşturur.
-                    // Bu socket'i tünelden muaf tutmak (traffic loop önleme) için
-                    // protect(int) çağrısına ihtiyaç var.
-                    // Biz bir UDP socket açıp protect edip fd'sini döndürüyoruz;
-                    // Go core bu fd'yi referans alarak kendi socket'lerini korur.
-                    return runCatching {
+            val libv2ray = Class.forName("libv2ray.Libv2ray")
+            val handlerClass = Class.forName("libv2ray.CoreCallbackHandler")
+
+            val handler = Proxy.newProxyInstance(
+                handlerClass.classLoader,
+                arrayOf(handlerClass)
+            ) { _, method, _ ->
+                when (method.name) {
+                    "startup" -> runCatching {
                         val s = DatagramSocket()
                         service.protect(s)
-                        val pfd = ParcelFileDescriptor.fromDatagramSocket(s)
-                        pfd.fd.toLong()
+                        ParcelFileDescriptor.fromDatagramSocket(s).fd.toLong()
                     }.getOrElse { e ->
                         Log.w(TAG, "Socket protect başarısız: ${e.message}")
                         0L
                     }
-                }
-                override fun shutdown(): Long = 0L
-                override fun onEmitStatus(l: Long, s: String): Long {
-                    Log.d(TAG, "Xray[$l]: $s")
-                    return 0L
+                    "shutdown" -> 0L
+                    "onEmitStatus" -> 0L
+                    else -> null
                 }
             }
-            controller = Libv2ray.newCoreController(handler)
-            controller!!.startLoop(configJson, tunFd)
+
+            val newCoreController = libv2ray.getMethod("newCoreController", handlerClass)
+            controller = newCoreController.invoke(null, handler)
+
+            controller!!.javaClass
+                .getMethod("startLoop", String::class.java, Int::class.java)
+                .invoke(controller, configJson, tunFd)
+
             Log.i(TAG, "Xray başlatıldı (tunFd=$tunFd)")
             true
         }.onFailure { e ->
@@ -78,15 +83,22 @@ class LibXrayEngine(
     }
 
     override fun stop() {
-        runCatching { controller?.stopLoop() }
+        runCatching {
+            controller?.javaClass?.getMethod("stopLoop")?.invoke(controller)
+        }
         controller = null
         Log.i(TAG, "Xray durduruldu")
     }
 
-    override fun isRunning() = controller?.isRunning ?: false
+    override fun isRunning(): Boolean = runCatching {
+        controller?.javaClass?.getMethod("isRunning")?.invoke(controller) as? Boolean
+    }.getOrDefault(false) ?: false
 
-    override fun queryStats(tag: String, uplink: Boolean) =
-        controller?.queryStats(tag, if (uplink) "uplink" else "downlink") ?: 0L
+    override fun queryStats(tag: String, uplink: Boolean): Long = runCatching {
+        controller?.javaClass
+            ?.getMethod("queryStats", String::class.java, String::class.java)
+            ?.invoke(controller, tag, if (uplink) "uplink" else "downlink") as? Long
+    }.getOrDefault(0L) ?: 0L
 }
 
 /**
