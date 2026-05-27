@@ -272,10 +272,8 @@ private fun TrafficStatsCard(stats: TrafficStats) {
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             TrafficItem("⬆", stats.uploadBps, stats.totalUpload)
-            Divider(
-                modifier = Modifier
-                    .height(40.dp)
-                    .width(1.dp),
+            VerticalDivider(
+                modifier = Modifier.height(40.dp),
                 color = MaterialTheme.colorScheme.outline
             )
             TrafficItem("⬇", stats.downloadBps, stats.totalDownload)

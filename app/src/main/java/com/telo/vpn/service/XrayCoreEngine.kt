@@ -2,10 +2,12 @@ package com.telo.vpn.service
 
 import android.content.Context
 import android.net.VpnService
+import android.os.ParcelFileDescriptor
 import android.util.Log
 import libv2ray.CoreCallbackHandler
 import libv2ray.CoreController
 import libv2ray.Libv2ray
+import java.net.DatagramSocket
 
 /**
  * Xray-core motor soyutlaması.
@@ -45,11 +47,20 @@ class LibXrayEngine(
         return runCatching {
             val handler = object : CoreCallbackHandler {
                 override fun startup(): Long {
-                    // Xray outbound socketlerini VPN tünelinden muaf tut
-                    // Go core bu callback'ten dönen fd'yi korur (protect)
-                    // Şimdilik 0 döndür; outbound socket leak'i önlemek için
-                    // builder.allowBypass() yeterli
-                    return 0L
+                    // Go core, VPN sunucusuna bağlanmak için bir socket oluşturur.
+                    // Bu socket'i tünelden muaf tutmak (traffic loop önleme) için
+                    // protect(int) çağrısına ihtiyaç var.
+                    // Biz bir UDP socket açıp protect edip fd'sini döndürüyoruz;
+                    // Go core bu fd'yi referans alarak kendi socket'lerini korur.
+                    return runCatching {
+                        val s = DatagramSocket()
+                        service.protect(s)
+                        val pfd = ParcelFileDescriptor.fromDatagramSocket(s)
+                        pfd.fd.toLong()
+                    }.getOrElse { e ->
+                        Log.w(TAG, "Socket protect başarısız: ${e.message}")
+                        0L
+                    }
                 }
                 override fun shutdown(): Long = 0L
                 override fun onEmitStatus(l: Long, s: String): Long {
