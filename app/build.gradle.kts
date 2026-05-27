@@ -96,8 +96,12 @@ dependencies {
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
-    // libXray — place libXray.aar in app/libs/ to enable real VPN tunnel
-    if (file("libs/libXray.aar").exists()) {
-        implementation(files("libs/libXray.aar"))
+    // libXray — AndroidLibXrayLite (libv2ray.aar)
+    // Dosya app/libs/libXray.aar olarak bekleniyor.
+    // GitHub Actions tarafından otomatik indirilir; yerelde:
+    //   curl -L -o app/libs/libXray.aar https://github.com/2dust/AndroidLibXrayLite/releases/latest/download/libv2ray.aar
+    val aarFile = file("libs/libXray.aar")
+    if (aarFile.exists()) {
+        implementation(files(aarFile))
     }
 }

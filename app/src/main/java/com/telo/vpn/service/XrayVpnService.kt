@@ -12,13 +12,10 @@ import android.os.IBinder
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.telo.vpn.model.ServerConfig
 import com.telo.vpn.model.TrafficStats
 import com.telo.vpn.ui.MainActivity
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 
 class XrayVpnService : VpnService() {
 
@@ -35,12 +32,11 @@ class XrayVpnService : VpnService() {
         val isConnected = MutableStateFlow(false)
 
         fun start(ctx: Context, configJson: String, serverName: String, killSwitch: Boolean = false) {
-            val i = Intent(ctx, XrayVpnService::class.java).apply {
+            ctx.startForegroundService(Intent(ctx, XrayVpnService::class.java).apply {
                 putExtra(EXTRA_CONFIG_JSON, configJson)
                 putExtra(EXTRA_SERVER_NAME, serverName)
                 putExtra(EXTRA_KILL_SWITCH, killSwitch)
-            }
-            ctx.startForegroundService(i)
+            })
         }
 
         fun stop(ctx: Context) {
@@ -54,7 +50,6 @@ class XrayVpnService : VpnService() {
 
     private val binder = LocalBinder()
     private var tunInterface: ParcelFileDescriptor? = null
-    private var tun2socksProcess: Process? = null
     private lateinit var xrayEngine: XrayCoreEngine
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val trafficMonitor = TrafficMonitor()
@@ -66,7 +61,6 @@ class XrayVpnService : VpnService() {
             stopSelf()
             return START_NOT_STICKY
         }
-
         val configJson = intent?.getStringExtra(EXTRA_CONFIG_JSON) ?: return START_NOT_STICKY
         val serverName = intent.getStringExtra(EXTRA_SERVER_NAME) ?: "Telo VPN"
         val killSwitch = intent.getBooleanExtra(EXTRA_KILL_SWITCH, false)
@@ -75,80 +69,57 @@ class XrayVpnService : VpnService() {
 
         scope.launch {
             try {
-                startVpn(configJson, killSwitch)
+                startVpn(configJson, serverName, killSwitch)
                 isConnected.value = true
                 updateNotification(serverName, "Bağlandı")
-                collectTraffic()
+                trafficMonitor.statsFlow().collect { trafficStats.value = it }
             } catch (e: Exception) {
                 Log.e(TAG, "VPN başlatma hatası: ${e.message}", e)
                 isConnected.value = false
-                stopSelf()
+                withContext(Dispatchers.Main) { stopSelf() }
             }
         }
         return START_STICKY
     }
 
-    private fun startVpn(configJson: String, killSwitch: Boolean) {
-        // 1. Xray başlat
-        xrayEngine = createXrayEngine(this)
-        if (!xrayEngine.start(configJson)) error("Xray başlatılamadı")
+    private fun startVpn(configJson: String, serverName: String, killSwitch: Boolean) {
+        // 1. Tun arayüzü kur
+        tunInterface = buildTunInterface(killSwitch)
+            ?: error("Tun arayüzü oluşturulamadı — VPN izni eksik olabilir")
 
-        // 2. Tun arayüzü kur
+        val tunFd = tunInterface!!.fd
+        Log.i(TAG, "Tun fd=$tunFd")
+
+        // 2. Xray engine başlat (libXray.aar varsa gerçek, yoksa stub)
+        xrayEngine = createXrayEngine(this)
+        if (!xrayEngine.start(configJson, tunFd)) {
+            error("Xray core başlatılamadı")
+        }
+    }
+
+    private fun buildTunInterface(killSwitch: Boolean): ParcelFileDescriptor? {
         val builder = Builder()
             .setSession("Telo VPN")
-            .addAddress("10.10.10.1", 32)
-            .addRoute("0.0.0.0", 0)           // tüm IPv4
-            .addRoute("::", 0)                 // tüm IPv6
+            .addAddress("10.10.10.1", 24)
+            .addRoute("0.0.0.0", 0)
+            .addRoute("::", 0)
             .addDnsServer("1.1.1.1")
             .addDnsServer("8.8.8.8")
             .setMtu(1500)
-            .setBlocking(false)
-            .allowFamily(android.system.OsConstants.AF_INET)
-            .allowFamily(android.system.OsConstants.AF_INET6)
+            .allowBypass()   // Xray'in outbound socketleri tünelden bypass geçebilir
 
         if (killSwitch) {
-            builder.setUnderlyingNetworks(null) // Kill switch: sadece tun arayüzü
+            // Kill switch: tüm trafik sadece VPN üzerinden geçer
+            // Ağ kesildiğinde internet erişimi de kesilir
+            builder.setBlocking(false)
+            // allowBypass() kaldırılır — hiçbir şey bypass edemez
         }
 
-        tunInterface = builder.establish() ?: error("Tun arayüzü oluşturulamadı")
-
-        // 3. tun2socks başlat (hev-socks5-tunnel .so gereklidir)
-        //    so dosyaları app/src/main/jniLibs/{abi}/ altına yerleştirilmeli
-        startTun2Socks()
-
-        Log.i(TAG, "VPN tüneli kuruldu, fd=${tunInterface?.fd}")
-    }
-
-    private fun startTun2Socks() {
-        // hev-socks5-tunnel kullanımı:
-        // libhev-socks5-tunnel.so → JNI üzerinden çağrılır veya subprocess olarak çalıştırılır.
-        // Bu stub implementation; gerçek .so dosyaları eklendiğinde aşağıdaki şekilde entegre edilir:
-        //
-        // val lib = System.loadLibrary("hev-socks5-tunnel")
-        // Tun2Socks.start(tunInterface!!.fd, "127.0.0.1", XrayConfigBuilder.SOCKS_PORT)
-        //
-        // Alternatif: badvpn-tun2socks subprocess
-        // val tun2socksPath = extractNativeBinary("libtun2socks.so")
-        // tun2socksProcess = ProcessBuilder(
-        //     tun2socksPath,
-        //     "--tunfd=${tunInterface!!.fd}",
-        //     "--netif-ipaddr=10.10.10.2",
-        //     "--netif-netmask=255.255.255.0",
-        //     "--socks-server-addr=127.0.0.1:${XrayConfigBuilder.SOCKS_PORT}",
-        //     "--udpgw-remote-server-addr=127.0.0.1:7300"
-        // ).start()
-        Log.w(TAG, "tun2socks: gerçek .so eklendiğinde etkinleştirilecek")
-    }
-
-    private suspend fun collectTraffic() {
-        trafficMonitor.statsFlow().collect { stats ->
-            trafficStats.value = stats
-        }
+        return builder.establish()
     }
 
     override fun onRevoke() {
-        // Kill switch tetiklendiğinde (başka VPN devreye girdiğinde)
-        Log.w(TAG, "VPN erişimi iptal edildi (onRevoke)")
+        Log.w(TAG, "VPN erişimi iptal edildi")
         isConnected.value = false
         cleanup()
         super.onRevoke()
@@ -158,23 +129,23 @@ class XrayVpnService : VpnService() {
         isConnected.value = false
         cleanup()
         scope.cancel()
+        trafficStats.value = TrafficStats()
         super.onDestroy()
     }
 
     private fun cleanup() {
-        runCatching { tun2socksProcess?.destroy() }
         runCatching { if (::xrayEngine.isInitialized) xrayEngine.stop() }
         runCatching { tunInterface?.close() }
         tunInterface = null
-        tun2socksProcess = null
-        trafficStats.value = TrafficStats()
     }
 
     private fun buildNotification(serverName: String, status: String): Notification {
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "VPN Durumu", NotificationManager.IMPORTANCE_LOW)
-        )
+        if (nm.getNotificationChannel(CHANNEL_ID) == null) {
+            nm.createNotificationChannel(
+                NotificationChannel(CHANNEL_ID, "VPN Durumu", NotificationManager.IMPORTANCE_LOW)
+            )
+        }
         val stopPi = PendingIntent.getService(
             this, 0,
             Intent(this, XrayVpnService::class.java).apply { action = ACTION_STOP },

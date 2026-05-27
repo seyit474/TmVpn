@@ -9,7 +9,11 @@ object XrayConfigBuilder {
     const val SOCKS_PORT = 10808
     const val DNS_PORT = 10853
 
-    fun build(cfg: ServerConfig): String {
+    /**
+     * [tunMode=true]  → sadece outbound + routing. Go core tun fd'yi doğrudan yönetir.
+     * [tunMode=false] → SOCKS inbound 10808 eklenir (test/debug için).
+     */
+    fun build(cfg: ServerConfig, tunMode: Boolean = true): String {
         return JSONObject().apply {
             put("log", JSONObject().put("loglevel", "warning"))
             put("stats", JSONObject())
@@ -20,7 +24,7 @@ object XrayConfigBuilder {
                     put("StatsService")
                 })
             })
-            put("inbounds", inbounds())
+            put("inbounds", inbounds(tunMode))
             put("outbounds", outbounds(cfg))
             put("routing", routing())
             put("dns", dns())
@@ -28,23 +32,26 @@ object XrayConfigBuilder {
         }.toString(2)
     }
 
-    private fun inbounds() = JSONArray().apply {
-        put(JSONObject().apply {
-            put("tag", "socks-in")
-            put("port", SOCKS_PORT)
-            put("listen", "127.0.0.1")
-            put("protocol", "socks")
-            put("settings", JSONObject().apply {
-                put("auth", "noauth")
-                put("udp", true)
-            })
-            put("sniffing", JSONObject().apply {
-                put("enabled", true)
-                put("destOverride", JSONArray().apply {
-                    put("http"); put("tls"); put("quic")
+    private fun inbounds(tunMode: Boolean) = JSONArray().apply {
+        if (!tunMode) {
+            // SOCKS inbound — sadece tün olmadan (debug) kullanılır
+            put(JSONObject().apply {
+                put("tag", "socks-in")
+                put("port", SOCKS_PORT)
+                put("listen", "127.0.0.1")
+                put("protocol", "socks")
+                put("settings", JSONObject().apply {
+                    put("auth", "noauth")
+                    put("udp", true)
+                })
+                put("sniffing", JSONObject().apply {
+                    put("enabled", true)
+                    put("destOverride", JSONArray().apply {
+                        put("http"); put("tls"); put("quic")
+                    })
                 })
             })
-        })
+        }
         put(JSONObject().apply {
             put("tag", "dns-in")
             put("port", DNS_PORT)
