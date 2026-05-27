@@ -1,23 +1,31 @@
 package com.telo.vpn.api
 
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+/**
+ * Marzban subscription response header'ından parse edilen kullanıcı bilgisi.
+ * Header formatı: "upload=0; download=1234567; total=10737418240; expire=1735689600"
+ */
+data class SubscriptionUserInfo(
+    val upload: Long = 0L,
+    val download: Long = 0L,
+    val total: Long = 0L,       // 0 = sınırsız
+    val expire: Long = 0L       // Unix timestamp, 0 = süresi yok
+) {
+    val usedBytes get() = upload + download
+    val remainingBytes get() = if (total == 0L) Long.MAX_VALUE else (total - usedBytes).coerceAtLeast(0)
+    val remainingGb get() = remainingBytes / 1_073_741_824.0
+    val totalGb get() = if (total == 0L) -1.0 else total / 1_073_741_824.0
 
-@Serializable
-data class TokenResponse(
-    @SerialName("access_token") val accessToken: String,
-    @SerialName("token_type") val tokenType: String = "bearer"
+    /** Kaç gün kaldı, -1 ise sınırsız */
+    val daysLeft: Int get() = when {
+        expire == 0L -> -1
+        else -> ((expire - System.currentTimeMillis() / 1000) / 86400).toInt().coerceAtLeast(0)
+    }
+
+    val isExpired: Boolean get() = expire != 0L && expire < System.currentTimeMillis() / 1000
+    val isUnlimited: Boolean get() = total == 0L
+}
+
+data class SubscriptionResult(
+    val userInfo: SubscriptionUserInfo,
+    val rawLinks: String      // base64 veya düz link listesi
 )
-
-@Serializable
-data class MarzbanUser(
-    val username: String,
-    val status: String = "active",
-    @SerialName("subscription_url") val subscriptionUrl: String = "",
-    val links: List<String> = emptyList(),
-    @SerialName("used_traffic") val usedTraffic: Long = 0,
-    @SerialName("data_limit") val dataLimit: Long = 0,
-    val expire: Long? = null
-)
-
-data class LoginRequest(val panelUrl: String, val username: String, val password: String)

@@ -20,10 +20,8 @@ import com.telo.vpn.ui.theme.TeloGreen
 fun SettingsScreen(vm: MainViewModel, prefs: AppPreferences) {
     val killSwitch by prefs.killSwitch.collectAsState(initial = false)
     val autoConnect by prefs.autoConnect.collectAsState(initial = false)
-    val panelUrl by prefs.panelUrl.collectAsState(initial = "")
-    val username by prefs.username.collectAsState(initial = "")
 
-    var showLogoutDialog by remember { mutableStateOf(false) }
+    var showResetDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -33,25 +31,6 @@ fun SettingsScreen(vm: MainViewModel, prefs: AppPreferences) {
         Spacer(Modifier.height(16.dp))
         Text("Ayarlar", fontSize = 20.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp))
-
-        // Hesap bilgisi
-        SectionHeader("Hesap")
-        if (panelUrl.isNotEmpty()) {
-            InfoRow(
-                icon = { Icon(Icons.Default.Language, contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-                title = "Panel",
-                value = panelUrl
-            )
-            InfoRow(
-                icon = { Icon(Icons.Default.Person, contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-                title = "Kullanıcı",
-                value = username
-            )
-        }
-
-        Spacer(Modifier.height(8.dp))
 
         // VPN Ayarları
         SectionHeader("VPN")
@@ -89,7 +68,7 @@ fun SettingsScreen(vm: MainViewModel, prefs: AppPreferences) {
             icon = { Icon(Icons.Default.Security, contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant) },
             title = "Protokol",
-            value = "VLESS / VMess / Shadowsocks"
+            value = "VLESS / VMess / Shadowsocks / Trojan"
         )
         InfoRow(
             icon = { Icon(Icons.Default.Code, contentDescription = null,
@@ -100,9 +79,9 @@ fun SettingsScreen(vm: MainViewModel, prefs: AppPreferences) {
 
         Spacer(Modifier.weight(1f))
 
-        // Çıkış butonu
+        // Anahtarı sıfırla butonu
         OutlinedButton(
-            onClick = { showLogoutDialog = true },
+            onClick = { showResetDialog = true },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 16.dp),
@@ -110,26 +89,26 @@ fun SettingsScreen(vm: MainViewModel, prefs: AppPreferences) {
         ) {
             Icon(Icons.Default.Logout, contentDescription = null)
             Spacer(Modifier.width(8.dp))
-            Text("Oturumu Kapat")
+            Text("Anahtarı Sıfırla")
         }
     }
 
-    if (showLogoutDialog) {
+    if (showResetDialog) {
         AlertDialog(
-            onDismissRequest = { showLogoutDialog = false },
-            title = { Text("Oturumu Kapat") },
-            text = { Text("Marzban oturumunuz kapatılacak ve sunucu listesi temizlenecek.") },
+            onDismissRequest = { showResetDialog = false },
+            title = { Text("Anahtarı Sıfırla") },
+            text = { Text("Abonelik anahtarınız silinecek. Tekrar bağlanmak için yeni anahtar girmeniz gerekecek.") },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        showLogoutDialog = false
+                        showResetDialog = false
                         vm.logout()
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = TeloError)
-                ) { Text("Kapat") }
+                ) { Text("Sıfırla") }
             },
             dismissButton = {
-                TextButton(onClick = { showLogoutDialog = false }) { Text("İptal") }
+                TextButton(onClick = { showResetDialog = false }) { Text("İptal") }
             }
         )
     }

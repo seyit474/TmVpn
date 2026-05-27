@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -15,6 +16,7 @@ import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -27,9 +29,10 @@ import com.telo.vpn.model.ConnectionState
 import com.telo.vpn.service.XrayConfigBuilder
 import com.telo.vpn.service.XrayVpnService
 import com.telo.vpn.ui.screens.HomeScreen
-import com.telo.vpn.ui.screens.LoginScreen
+import com.telo.vpn.ui.screens.KeyEntryScreen
 import com.telo.vpn.ui.screens.ServerListScreen
 import com.telo.vpn.ui.screens.SettingsScreen
+import com.telo.vpn.ui.theme.TeloGreen
 import com.telo.vpn.ui.theme.TeloVpnTheme
 
 class MainActivity : ComponentActivity() {
@@ -52,15 +55,19 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val isLoggedIn by vm.isLoggedIn.collectAsStateWithLifecycle()
+                    val screen by vm.screen.collectAsStateWithLifecycle()
                     val isConnected by vm.isVpnConnected.collectAsStateWithLifecycle()
 
-                    if (!isLoggedIn) {
-                        LoginScreen(vm = vm)
-                    } else {
-                        MainNavigation(
+                    when (screen) {
+                        MainViewModel.Screen.Loading -> {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(color = TeloGreen)
+                            }
+                        }
+                        MainViewModel.Screen.KeyEntry -> KeyEntryScreen(vm = vm)
+                        MainViewModel.Screen.Main -> MainNavigation(
                             vm = vm,
-                            prefs = AppPreferences(this),
+                            prefs = AppPreferences(this@MainActivity),
                             isConnected = isConnected,
                             onConnectClick = { requestVpnPermission() },
                             onDisconnect = { disconnectVpn() }

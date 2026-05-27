@@ -2,184 +2,135 @@ package com.telo.vpn.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.telo.vpn.ui.MainViewModel
 import com.telo.vpn.ui.theme.TeloGreen
 
 @Composable
-fun LoginScreen(vm: MainViewModel) {
-    val loginState by vm.loginState.collectAsState()
+fun KeyEntryScreen(vm: MainViewModel) {
+    val isLoading by vm.isKeyLoading.collectAsStateWithLifecycle()
+    val error by vm.keyError.collectAsStateWithLifecycle()
+    val keyboard = LocalSoftwareKeyboardController.current
 
-    var panelUrl by remember { mutableStateOf("") }
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
+    var key by remember { mutableStateOf("") }
+    var keyVisible by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Spacer(Modifier.height(64.dp))
-
         // Logo
-        Text(
-            text = "telo",
-            fontSize = 48.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = TeloGreen
-        )
-        Text(
-            text = "VPN",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Light,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Text("telo", fontSize = 56.sp, fontWeight = FontWeight.ExtraBold, color = TeloGreen)
+        Text("VPN", fontSize = 22.sp, fontWeight = FontWeight.Light,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
 
         Spacer(Modifier.height(48.dp))
-        Text(
-            text = "Marzban Paneline Giriş",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.SemiBold
-        )
+
+        Icon(Icons.Default.Key, contentDescription = null,
+            modifier = Modifier.size(48.dp), tint = TeloGreen)
+        Spacer(Modifier.height(16.dp))
+
+        Text("Erişim Anahtarınızı Girin", fontSize = 18.sp, fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Panel URL'inizi ve yönetici bilgilerinizi girin",
+            "Yöneticinizden aldığınız abonelik anahtarını buraya yapıştırın.",
             fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
         )
 
         Spacer(Modifier.height(32.dp))
 
         OutlinedTextField(
-            value = panelUrl,
-            onValueChange = { panelUrl = it },
-            label = { Text("Panel URL") },
-            placeholder = { Text("https://panel.example.com") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Uri,
-                imeAction = ImeAction.Next
-            ),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = TeloGreen,
-                focusedLabelColor = TeloGreen
-            )
-        )
-
-        Spacer(Modifier.height(12.dp))
-
-        OutlinedTextField(
-            value = username,
-            onValueChange = { username = it },
-            label = { Text("Kullanıcı Adı") },
-            leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(
-                imeAction = ImeAction.Next
-            ),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = TeloGreen,
-                focusedLabelColor = TeloGreen
-            )
-        )
-
-        Spacer(Modifier.height(12.dp))
-
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Şifre") },
-            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+            value = key,
+            onValueChange = { key = it },
+            label = { Text("Anahtar") },
+            placeholder = { Text("https://... veya token yapıştırın") },
             trailingIcon = {
-                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                IconButton(onClick = { keyVisible = !keyVisible }) {
                     Icon(
-                        if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        if (keyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                         contentDescription = null
                     )
                 }
             },
+            visualTransformation = if (keyVisible) VisualTransformation.None
+                                   else PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            singleLine = false,
+            maxLines = 3,
             keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Password,
+                keyboardType = KeyboardType.Uri,
                 imeAction = ImeAction.Done
             ),
+            keyboardActions = KeyboardActions(onDone = {
+                keyboard?.hide()
+                vm.submitKey(key)
+            }),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = TeloGreen,
                 focusedLabelColor = TeloGreen
             )
         )
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(8.dp))
 
-        AnimatedVisibility(loginState is MainViewModel.LoginState.Error) {
-            val msg = (loginState as? MainViewModel.LoginState.Error)?.message ?: ""
+        AnimatedVisibility(error != null) {
             Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer
-                ),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = msg,
+                    error ?: "",
                     color = MaterialTheme.colorScheme.onErrorContainer,
                     modifier = Modifier.padding(12.dp),
                     fontSize = 13.sp
                 )
             }
-            Spacer(Modifier.height(12.dp))
         }
+
+        Spacer(Modifier.height(24.dp))
 
         Button(
             onClick = {
-                if (panelUrl.isNotBlank() && username.isNotBlank() && password.isNotBlank()) {
-                    vm.login(panelUrl.trim(), username.trim(), password)
-                }
+                keyboard?.hide()
+                vm.submitKey(key)
             },
-            enabled = loginState !is MainViewModel.LoginState.Loading &&
-                panelUrl.isNotBlank() && username.isNotBlank() && password.isNotBlank(),
+            enabled = !isLoading && key.isNotBlank(),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp),
             colors = ButtonDefaults.buttonColors(containerColor = TeloGreen)
         ) {
-            if (loginState is MainViewModel.LoginState.Loading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
             } else {
-                Text(
-                    "Giriş Yap",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
+                Text("Bağlan", fontSize = 16.sp, fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimary)
             }
         }
     }

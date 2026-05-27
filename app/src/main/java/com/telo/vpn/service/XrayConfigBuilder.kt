@@ -81,9 +81,10 @@ object XrayConfigBuilder {
     }
 
     private fun proxyOutbound(cfg: ServerConfig) = when (cfg.protocol) {
-        ServerConfig.Protocol.VLESS -> vlessOutbound(cfg)
-        ServerConfig.Protocol.VMESS -> vmessOutbound(cfg)
+        ServerConfig.Protocol.VLESS       -> vlessOutbound(cfg)
+        ServerConfig.Protocol.VMESS       -> vmessOutbound(cfg)
         ServerConfig.Protocol.SHADOWSOCKS -> ssOutbound(cfg)
+        ServerConfig.Protocol.TROJAN      -> trojanOutbound(cfg)
     }
 
     private fun vlessOutbound(cfg: ServerConfig) = JSONObject().apply {
@@ -102,6 +103,13 @@ object XrayConfigBuilder {
         })
         put("streamSettings", streamSettings(cfg))
         put("mux", JSONObject().put("enabled", false))
+        cfg.fragmentPackets?.let {
+            put("fragment", JSONObject().apply {
+                put("packets", it)
+                cfg.fragmentLength?.let { l -> put("length", l) }
+                cfg.fragmentInterval?.let { i -> put("interval", i) }
+            })
+        }
     }
 
     private fun vmessOutbound(cfg: ServerConfig) = JSONObject().apply {
@@ -120,6 +128,13 @@ object XrayConfigBuilder {
         })
         put("streamSettings", streamSettings(cfg))
         put("mux", JSONObject().put("enabled", true).put("concurrency", 8))
+        cfg.fragmentPackets?.let {
+            put("fragment", JSONObject().apply {
+                put("packets", it)
+                cfg.fragmentLength?.let { l -> put("length", l) }
+                cfg.fragmentInterval?.let { i -> put("interval", i) }
+            })
+        }
     }
 
     private fun ssOutbound(cfg: ServerConfig) = JSONObject().apply {
@@ -133,6 +148,26 @@ object XrayConfigBuilder {
                 put("password", cfg.password)
             }))
         })
+    }
+
+    private fun trojanOutbound(cfg: ServerConfig) = JSONObject().apply {
+        put("tag", "proxy")
+        put("protocol", "trojan")
+        put("settings", JSONObject().apply {
+            put("servers", JSONArray().put(JSONObject().apply {
+                put("address", cfg.address)
+                put("port", cfg.port)
+                put("password", cfg.password)
+            }))
+        })
+        put("streamSettings", streamSettings(cfg))
+        cfg.fragmentPackets?.let {
+            put("fragment", JSONObject().apply {
+                put("packets", it)
+                cfg.fragmentLength?.let { l -> put("length", l) }
+                cfg.fragmentInterval?.let { i -> put("interval", i) }
+            })
+        }
     }
 
     private fun streamSettings(cfg: ServerConfig) = JSONObject().apply {
@@ -160,11 +195,20 @@ object XrayConfigBuilder {
                 cfg.host?.let { put("headers", JSONObject().put("Host", it)) }
             })
             "grpc" -> put("grpcSettings", JSONObject().apply {
-                cfg.path?.let { put("serviceName", it) }
+                val svcName = cfg.serviceName ?: cfg.path ?: ""
+                put("serviceName", svcName)
             })
             "h2" -> put("httpSettings", JSONObject().apply {
                 cfg.host?.let { put("host", JSONArray().put(it)) }
                 cfg.path?.let { put("path", it) }
+            })
+            "xhttp" -> put("xhttpSettings", JSONObject().apply {
+                cfg.path?.let { put("path", it) }
+                cfg.host?.let { put("host", it) }
+                cfg.xhttpMode?.let { put("mode", it) }
+                cfg.xhttpExtra?.takeIf { it.isNotBlank() }?.let {
+                    runCatching { put("extra", JSONObject(it)) }
+                }
             })
         }
     }

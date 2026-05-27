@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.telo.vpn.api.SubscriptionUserInfo
 import com.telo.vpn.model.ConnectionState
 import com.telo.vpn.model.TrafficStats
 import com.telo.vpn.ui.MainViewModel
@@ -35,6 +36,7 @@ fun HomeScreen(
     val connState by vm.connState.collectAsState()
     val isConnected by vm.isVpnConnected.collectAsState()
     val traffic by vm.trafficStats.collectAsState()
+    val userInfo by vm.userInfo.collectAsState()
 
     Column(
         modifier = Modifier
@@ -66,6 +68,11 @@ fun HomeScreen(
 
         Spacer(Modifier.height(8.dp))
 
+        // Kullanıcı bilgi kartı
+        UserInfoCard(userInfo)
+
+        Spacer(Modifier.height(8.dp))
+
         // Durum metni
         StatusText(connState, isConnected)
 
@@ -94,7 +101,7 @@ fun HomeScreen(
                 SelectedServerCard(
                     serverName = s.selected.remark,
                     protocol = s.selected.protocol.name,
-                    latency = s.results.find { it.config.id == s.selected.id }?.latencyMs
+                    latency = s.servers.find { it.config.id == s.selected.id }?.latencyMs
                 )
             }
             connState is ConnectionState.Error -> {
@@ -106,6 +113,76 @@ fun HomeScreen(
                 LoadingCard(connState)
             }
             else -> {}
+        }
+    }
+}
+
+@Composable
+private fun UserInfoCard(info: SubscriptionUserInfo) {
+    if (info.daysLeft == -1 && info.isUnlimited) return  // hiç bilgi yok
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Kalan gün
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = if (info.daysLeft == -1) "∞" else "${info.daysLeft}",
+                    fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TeloGreen
+                )
+                Text("gün kaldı", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
+            VerticalDivider(modifier = Modifier.height(40.dp),
+                color = MaterialTheme.colorScheme.outline)
+
+            // Kalan veri
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                if (info.isUnlimited) {
+                    Text("∞", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TeloGreen)
+                } else {
+                    Text(
+                        text = "%.1f GB".format(info.remainingGb),
+                        fontSize = 22.sp, fontWeight = FontWeight.Bold,
+                        color = when {
+                            info.remainingGb < 0.5 -> TeloError
+                            info.remainingGb < 2.0 -> TeloWarning
+                            else -> TeloGreen
+                        }
+                    )
+                }
+                Text("kalan veri", fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
+            VerticalDivider(modifier = Modifier.height(40.dp),
+                color = MaterialTheme.colorScheme.outline)
+
+            // Kullanılan / Toplam
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = formatBytes(info.usedBytes),
+                    fontSize = 16.sp, fontWeight = FontWeight.Bold
+                )
+                Text("kullanıldı", fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
+        if (info.isExpired) {
+            Text(
+                "Aboneliğinizin süresi dolmuş",
+                color = TeloError,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
         }
     }
 }

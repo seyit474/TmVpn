@@ -5,13 +5,12 @@ import android.content.Context
 import android.content.Intent
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.telo.vpn.api.MarzbanApi
 import com.telo.vpn.dataStore
 import com.telo.vpn.subscription.ConfigParser
-import com.telo.vpn.api.MarzbanApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 class BootReceiver : BroadcastReceiver() {
@@ -24,13 +23,14 @@ class BootReceiver : BroadcastReceiver() {
             val autoConnect = prefs[booleanPreferencesKey("auto_connect")] ?: false
             if (!autoConnect) return@launch
 
-            val subUrl = prefs[stringPreferencesKey("sub_url")] ?: return@launch
-            if (subUrl.isEmpty()) return@launch
+            // Yeni key-based yaklaşım: sub_key DataStore'dan okunur
+            val subKey = prefs[stringPreferencesKey("sub_key")] ?: return@launch
+            if (subKey.isEmpty()) return@launch
 
             runCatching {
                 val api = MarzbanApi()
-                val raw = api.fetchSubscription(subUrl).getOrThrow()
-                val servers = ConfigParser.parseSubscription(raw)
+                val result = api.fetchSubscription(subKey).getOrThrow()
+                val servers = ConfigParser.parseSubscription(result.rawLinks)
                 val first = servers.firstOrNull() ?: return@runCatching
                 val config = XrayConfigBuilder.build(first)
                 val killSwitch = prefs[booleanPreferencesKey("kill_switch")] ?: false

@@ -72,7 +72,7 @@ fun ServerListScreen(vm: MainViewModel) {
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(s.results, key = { it.config.id }) { pinged ->
+                    items(s.servers, key = { it.config.id }) { pinged ->
                         ServerRow(
                             pinged = pinged,
                             selected = pinged.config.id == selectedId,

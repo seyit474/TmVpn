@@ -2,49 +2,51 @@ package com.telo.vpn.data
 
 import android.content.Context
 import com.telo.vpn.api.MarzbanApi
+import com.telo.vpn.api.SubscriptionUserInfo
 import com.telo.vpn.model.PingedServer
-import com.telo.vpn.model.ServerConfig
 import com.telo.vpn.ping.ServerPinger
 import com.telo.vpn.subscription.ConfigParser
 import kotlinx.coroutines.flow.first
 
 class MarzbanRepository(context: Context) {
 
-    private val prefs = AppPreferences(context)
+    val prefs = AppPreferences(context)
     private val api = MarzbanApi()
     private val pinger = ServerPinger()
 
-    /** Login → token kaydet → subscription URL al → sunucu listesi döndür */
-    suspend fun login(
-        panelUrl: String,
-        username: String,
-        password: String
-    ): Result<List<PingedServer>> = runCatching {
-        val token = api.login(panelUrl, username, password).getOrThrow().accessToken
-        val user = api.getUser(panelUrl, username, token).getOrThrow()
-        val subUrl = user.subscriptionUrl.ifEmpty {
-            error("Bu kullanıcı için abonelik URL'i bulunamadı")
+    /**
+     * Verilen sub URL (anahtar) ile subscription çeker, parse eder, ping atar.
+     * Başarılı olursa anahtarı DataStore'a kaydeder.
+     */
+    suspend fun connectWithKey(subKey: String): Result<Pair<SubscriptionUserInfo, List<PingedServer>>> =
+        runCatching {
+            val normalizedKey = normalizeKey(subKey)
+            val result = api.fetchSubscription(normalizedKey).getOrThrow()
+            val configs = ConfigParser.parseSubscription(result.rawLinks)
+            if (configs.isEmpty()) error("Abonelikte sunucu bulunamadı")
+            prefs.saveKey(normalizedKey)
+            val pinged = pinger.pingAll(configs)
+            result.userInfo to pinged
         }
-        prefs.saveSession(panelUrl, username, token, subUrl)
-        fetchAndPingServers(subUrl)
-    }
 
-    /** Kayıtlı session'dan sunucu listesi güncelle */
-    suspend fun refreshServers(): Result<List<PingedServer>> = runCatching {
-        val subUrl = prefs.subUrl.first().ifEmpty { error("Oturum açılmamış") }
-        fetchAndPingServers(subUrl)
-    }
-
-    suspend fun isLoggedIn(): Boolean = prefs.subUrl.first().isNotEmpty()
-
-    suspend fun getPrefs() = prefs
-
-    private suspend fun fetchAndPingServers(subUrl: String): List<PingedServer> {
-        val raw = api.fetchSubscription(subUrl).getOrThrow()
-        val configs = ConfigParser.parseSubscription(raw)
+    /** Kayıtlı anahtar ile yenile */
+    suspend fun refresh(): Result<Pair<SubscriptionUserInfo, List<PingedServer>>> = runCatching {
+        val key = prefs.subKey.first().ifEmpty { error("Anahtar girilmemiş") }
+        val result = api.fetchSubscription(key).getOrThrow()
+        val configs = ConfigParser.parseSubscription(result.rawLinks)
         if (configs.isEmpty()) error("Abonelikte sunucu bulunamadı")
-        return pinger.pingAll(configs)
+        pinger.pingAll(configs).let { result.userInfo to it }
     }
 
-    suspend fun clearSession() = prefs.clearSession()
+    suspend fun hasKey(): Boolean = prefs.subKey.first().isNotEmpty()
+    suspend fun clearKey() = prefs.clearKey()
+
+    /** http:// veya https:// ile başlamıyorsa https:// ekle */
+    private fun normalizeKey(key: String): String {
+        val trimmed = key.trim()
+        return when {
+            trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed
+            else -> "https://$trimmed"
+        }
+    }
 }
