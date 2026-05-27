@@ -1,4 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">TmVpn</string>
+    <string name="app_name">Telo VPN</string>
+    <string name="connect">BAGLAN</string>
+    <string name="disconnect">KES</string>
+    <string name="connecting">Baglanıyor…</string>
+    <string name="connected">BAGLI</string>
+    <string name="idle">Hazır</string>
+    <string name="loading">Sunucular yükleniyor…</string>
+    <string name="testing">Hızlar ölçülüyor…</string>
+    <string name="servers">Sunucular</string>
+    <string name="settings">Ayarlar</string>
+    <string name="home">Ana Sayfa</string>
+    <string name="login">Giriş Yap</string>
+    <string name="panel_url">Panel URL</string>
+    <string name="username">Kullanıcı Adı</string>
+    <string name="password">Şifre</string>
+    <string name="kill_switch">Kill Switch</string>
+    <string name="auto_connect">Önyüklemede bağlan</string>
+    <string name="logout">Çıkış Yap</string>
+    <string name="retry">Tekrar Dene</string>
+    <string name="channel_name">VPN Durumu</string>
 </resources>

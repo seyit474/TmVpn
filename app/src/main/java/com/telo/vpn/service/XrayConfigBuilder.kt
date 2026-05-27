@@ -1,34 +1,34 @@
-package com.seyit474.tmvpn.service
+package com.telo.vpn.service
 
-import com.seyit474.tmvpn.model.ServerConfig
+import com.telo.vpn.model.ServerConfig
 import org.json.JSONArray
 import org.json.JSONObject
 
-/**
- * ServerConfig'i Xray-core'un anlayacağı JSON yapısına çevirir.
- *
- * SOCKS inbound 10808 + DNS inbound 10853 + outbound (vless/vmess/ss).
- * VpnService tarafından açılan tun arayüzü, tun2socks ile bu SOCKS portuna
- * yönlendirilir. Böylece tüm cihaz trafiği Xray üzerinden geçer.
- */
 object XrayConfigBuilder {
 
-    private const val SOCKS_PORT = 10808
-    private const val DNS_PORT = 10853
+    const val SOCKS_PORT = 10808
+    const val DNS_PORT = 10853
 
     fun build(cfg: ServerConfig): String {
-        val root = JSONObject().apply {
+        return JSONObject().apply {
             put("log", JSONObject().put("loglevel", "warning"))
+            put("stats", JSONObject())
+            put("api", JSONObject().apply {
+                put("tag", "api")
+                put("services", JSONArray().apply {
+                    put("HandlerService")
+                    put("StatsService")
+                })
+            })
             put("inbounds", inbounds())
             put("outbounds", outbounds(cfg))
             put("routing", routing())
             put("dns", dns())
-        }
-        return root.toString(2)
+            put("policy", policy())
+        }.toString(2)
     }
 
-    private fun inbounds(): JSONArray = JSONArray().apply {
-        // SOCKS — tun2socks bağlanacak
+    private fun inbounds() = JSONArray().apply {
         put(JSONObject().apply {
             put("tag", "socks-in")
             put("port", SOCKS_PORT)
@@ -45,7 +45,6 @@ object XrayConfigBuilder {
                 })
             })
         })
-        // DNS in
         put(JSONObject().apply {
             put("tag", "dns-in")
             put("port", DNS_PORT)
@@ -57,20 +56,27 @@ object XrayConfigBuilder {
                 put("network", "tcp,udp")
             })
         })
+        put(JSONObject().apply {
+            put("tag", "api-in")
+            put("port", 10085)
+            put("listen", "127.0.0.1")
+            put("protocol", "dokodemo-door")
+            put("settings", JSONObject().apply {
+                put("address", "127.0.0.1")
+            })
+        })
     }
 
-    private fun outbounds(cfg: ServerConfig): JSONArray = JSONArray().apply {
+    private fun outbounds(cfg: ServerConfig) = JSONArray().apply {
         put(proxyOutbound(cfg))
         put(JSONObject().apply { put("tag", "direct"); put("protocol", "freedom") })
         put(JSONObject().apply { put("tag", "block"); put("protocol", "blackhole") })
     }
 
-    private fun proxyOutbound(cfg: ServerConfig): JSONObject {
-        return when (cfg.protocol) {
-            ServerConfig.Protocol.VLESS -> vlessOutbound(cfg)
-            ServerConfig.Protocol.VMESS -> vmessOutbound(cfg)
-            ServerConfig.Protocol.SHADOWSOCKS -> ssOutbound(cfg)
-        }
+    private fun proxyOutbound(cfg: ServerConfig) = when (cfg.protocol) {
+        ServerConfig.Protocol.VLESS -> vlessOutbound(cfg)
+        ServerConfig.Protocol.VMESS -> vmessOutbound(cfg)
+        ServerConfig.Protocol.SHADOWSOCKS -> ssOutbound(cfg)
     }
 
     private fun vlessOutbound(cfg: ServerConfig) = JSONObject().apply {
@@ -88,6 +94,7 @@ object XrayConfigBuilder {
             }))
         })
         put("streamSettings", streamSettings(cfg))
+        put("mux", JSONObject().put("enabled", false))
     }
 
     private fun vmessOutbound(cfg: ServerConfig) = JSONObject().apply {
@@ -105,6 +112,7 @@ object XrayConfigBuilder {
             }))
         })
         put("streamSettings", streamSettings(cfg))
+        put("mux", JSONObject().put("enabled", true).put("concurrency", 8))
     }
 
     private fun ssOutbound(cfg: ServerConfig) = JSONObject().apply {
@@ -123,7 +131,6 @@ object XrayConfigBuilder {
     private fun streamSettings(cfg: ServerConfig) = JSONObject().apply {
         put("network", cfg.network)
         put("security", cfg.security)
-
         when (cfg.security) {
             "reality" -> put("realitySettings", JSONObject().apply {
                 cfg.sni?.let { put("serverName", it) }
@@ -140,7 +147,6 @@ object XrayConfigBuilder {
                 }
             })
         }
-
         when (cfg.network) {
             "ws" -> put("wsSettings", JSONObject().apply {
                 cfg.path?.let { put("path", it) }
@@ -149,25 +155,31 @@ object XrayConfigBuilder {
             "grpc" -> put("grpcSettings", JSONObject().apply {
                 cfg.path?.let { put("serviceName", it) }
             })
+            "h2" -> put("httpSettings", JSONObject().apply {
+                cfg.host?.let { put("host", JSONArray().put(it)) }
+                cfg.path?.let { put("path", it) }
+            })
         }
     }
 
-    private fun routing(): JSONObject = JSONObject().apply {
+    private fun routing() = JSONObject().apply {
         put("domainStrategy", "IPIfNonMatch")
         put("rules", JSONArray().apply {
-            // DNS trafiğini DNS outbound'a yönlendir (yoksa döngü olur)
+            put(JSONObject().apply {
+                put("type", "field")
+                put("inboundTag", JSONArray().put("api-in"))
+                put("outboundTag", "api")
+            })
             put(JSONObject().apply {
                 put("type", "field")
                 put("inboundTag", JSONArray().put("dns-in"))
                 put("outboundTag", "proxy")
             })
-            // private IP'leri direct
             put(JSONObject().apply {
                 put("type", "field")
                 put("ip", JSONArray().put("geoip:private"))
                 put("outboundTag", "direct")
             })
-            // reklam / kötü amaçlı engelle
             put(JSONObject().apply {
                 put("type", "field")
                 put("domain", JSONArray().put("geosite:category-ads-all"))
@@ -176,10 +188,22 @@ object XrayConfigBuilder {
         })
     }
 
-    private fun dns(): JSONObject = JSONObject().apply {
+    private fun dns() = JSONObject().apply {
         put("servers", JSONArray().apply {
+            put(JSONObject().apply {
+                put("address", "https://1.1.1.1/dns-query")
+                put("domains", JSONArray().put("geosite:geolocation-!cn"))
+            })
             put("1.1.1.1")
             put("8.8.8.8")
+        })
+        put("queryStrategy", "UseIP")
+    }
+
+    private fun policy() = JSONObject().apply {
+        put("system", JSONObject().apply {
+            put("statsOutboundUplink", true)
+            put("statsOutboundDownlink", true)
         })
     }
 }
