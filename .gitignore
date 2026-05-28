@@ -24,7 +24,6 @@ keystore.properties
 app/release/
 app/debug/
 
-# Binary kütüphaneler — GitHub Actions otomatik indirir, repoya push etme
-app/libs/libXray.aar
-app/libs/*.aar
+# Binary kütüphaneler — repoya dahil edildi (libXray.aar)
+# app/libs/libXray.aar  ← artık repoda mevcut
 app/src/main/jniLibs/**/*.so
