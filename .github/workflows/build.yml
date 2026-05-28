@@ -32,7 +32,7 @@ jobs:
         run: |
           mkdir -p app/libs
           curl -fsSL -o app/libs/libXray.aar \
-            "https://github.com/2dust/AndroidLibXrayLite/releases/download/26.5.19/libv2ray.aar"
+            "https://github.com/2dust/AndroidLibXrayLite/releases/latest/download/libv2ray.aar"
           echo "libXray.aar indirildi: $(du -sh app/libs/libXray.aar | cut -f1)"
 
       - name: Generate Gradle Wrapper if missing
