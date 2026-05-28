@@ -8,20 +8,22 @@ import androidx.compose.runtime.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.telo.vpn.data.AppPreferences
 import com.telo.vpn.ui.MainViewModel
-import com.telo.vpn.ui.theme.TeloError
 import com.telo.vpn.ui.theme.TeloGreen
 
 @Composable
 fun SettingsScreen(vm: MainViewModel, prefs: AppPreferences) {
     val killSwitch by prefs.killSwitch.collectAsState(initial = false)
     val autoConnect by prefs.autoConnect.collectAsState(initial = false)
-
-    var showResetDialog by remember { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
+    var hwidCopied by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -29,10 +31,67 @@ fun SettingsScreen(vm: MainViewModel, prefs: AppPreferences) {
             .padding(horizontal = 16.dp)
     ) {
         Spacer(Modifier.height(16.dp))
-        Text("Ayarlar", fontSize = 20.sp, fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp))
+        Text(
+            "Ayarlar", fontSize = 20.sp, fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+        )
 
-        // VPN Ayarları
+        SectionHeader("Cihaz")
+
+        // HWID kartı
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.Fingerprint,
+                    contentDescription = null,
+                    tint = TeloGreen,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Cihaz HWID", fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        vm.hwid,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+                IconButton(onClick = {
+                    clipboard.setText(AnnotatedString(vm.hwid))
+                    hwidCopied = true
+                }) {
+                    Icon(
+                        if (hwidCopied) Icons.Default.Check else Icons.Default.ContentCopy,
+                        contentDescription = "Kopyala",
+                        tint = if (hwidCopied) TeloGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+
+        if (hwidCopied) {
+            Text(
+                "Kopyalandı — Marzban'da bu HWID ile kullanıcı oluşturun",
+                fontSize = 11.sp,
+                color = TeloGreen,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
         SectionHeader("VPN")
 
         ToggleRow(
@@ -55,14 +114,13 @@ fun SettingsScreen(vm: MainViewModel, prefs: AppPreferences) {
         )
 
         Spacer(Modifier.height(24.dp))
-
-        // Hakkında
         SectionHeader("Uygulama")
+
         InfoRow(
             icon = { Icon(Icons.Default.Info, contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant) },
             title = "Versiyon",
-            value = "1.0.0"
+            value = "2.0.0"
         )
         InfoRow(
             icon = { Icon(Icons.Default.Security, contentDescription = null,
@@ -75,41 +133,6 @@ fun SettingsScreen(vm: MainViewModel, prefs: AppPreferences) {
                 tint = MaterialTheme.colorScheme.onSurfaceVariant) },
             title = "Altyapı",
             value = "Xray-core + Marzban"
-        )
-
-        Spacer(Modifier.weight(1f))
-
-        // Anahtarı sıfırla butonu
-        OutlinedButton(
-            onClick = { showResetDialog = true },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = TeloError)
-        ) {
-            Icon(Icons.Default.Logout, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text("Anahtarı Sıfırla")
-        }
-    }
-
-    if (showResetDialog) {
-        AlertDialog(
-            onDismissRequest = { showResetDialog = false },
-            title = { Text("Anahtarı Sıfırla") },
-            text = { Text("Abonelik anahtarınız silinecek. Tekrar bağlanmak için yeni anahtar girmeniz gerekecek.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showResetDialog = false
-                        vm.logout()
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = TeloError)
-                ) { Text("Sıfırla") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showResetDialog = false }) { Text("İptal") }
-            }
         )
     }
 }

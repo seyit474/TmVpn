@@ -19,8 +19,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repo = MarzbanRepository(app)
 
-    private val _screen = MutableStateFlow<Screen>(Screen.Loading)
-    val screen: StateFlow<Screen> = _screen.asStateFlow()
+    val hwid: String get() = repo.getHwid()
 
     private val _connState = MutableStateFlow<ConnectionState>(ConnectionState.Idle)
     val connState: StateFlow<ConnectionState> = _connState.asStateFlow()
@@ -28,63 +27,26 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _userInfo = MutableStateFlow(SubscriptionUserInfo())
     val userInfo: StateFlow<SubscriptionUserInfo> = _userInfo.asStateFlow()
 
-    private val _keyError = MutableStateFlow<String?>(null)
-    val keyError: StateFlow<String?> = _keyError.asStateFlow()
-
-    private val _isKeyLoading = MutableStateFlow(false)
-    val isKeyLoading: StateFlow<Boolean> = _isKeyLoading.asStateFlow()
-
     val trafficStats: StateFlow<TrafficStats> = XrayVpnService.trafficStats
     val isVpnConnected: StateFlow<Boolean> = XrayVpnService.isConnected
 
     private var _killSwitch = false
     val killSwitch get() = _killSwitch
 
-    sealed interface Screen {
-        data object Loading  : Screen
-        data object KeyEntry : Screen
-        data object Main     : Screen
-    }
-
     init {
         viewModelScope.launch {
             _killSwitch = repo.prefs.killSwitch.first()
-            if (repo.hasKey()) {
-                _screen.value = Screen.Main
-                loadServers()
-            } else {
-                _screen.value = Screen.KeyEntry
-            }
+            loadServers()
         }
         viewModelScope.launch {
             repo.prefs.killSwitch.collect { _killSwitch = it }
         }
     }
 
-    fun submitKey(key: String) {
-        if (key.isBlank()) return
-        viewModelScope.launch {
-            _isKeyLoading.value = true
-            _keyError.value = null
-            repo.connectWithKey(key)
-                .onSuccess { (info, servers) ->
-                    _userInfo.value = info
-                    val best = servers.firstOrNull { it.isReachable }
-                    _connState.value = if (best != null)
-                        ConnectionState.Ready(servers, best.config)
-                    else
-                        ConnectionState.Error("Erişilebilir sunucu bulunamadı")
-                    _screen.value = Screen.Main
-                }
-                .onFailure { _keyError.value = it.message ?: "Geçersiz anahtar" }
-            _isKeyLoading.value = false
-        }
-    }
-
     fun loadServers() {
         viewModelScope.launch {
             _connState.value = ConnectionState.Loading
-            repo.refresh()
+            repo.loadSubscription()
                 .onSuccess { (info, servers) ->
                     _userInfo.value = info
                     val best = servers.firstOrNull { it.isReachable }
@@ -94,7 +56,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         ConnectionState.Error("Erişilebilir sunucu bulunamadı")
                 }
                 .onFailure {
-                    _connState.value = ConnectionState.Error(it.message ?: "Yenileme başarısız")
+                    _connState.value = ConnectionState.Error(
+                        it.message ?: "Bağlantı hatası — HWID: $hwid"
+                    )
                 }
         }
     }
@@ -113,16 +77,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun onDisconnect() {
         _connState.value = ConnectionState.Idle
         loadServers()
-    }
-
-    fun logout() {
-        viewModelScope.launch {
-            repo.clearKey()
-            _screen.value = Screen.KeyEntry
-            _connState.value = ConnectionState.Idle
-            _userInfo.value = SubscriptionUserInfo()
-            _keyError.value = null
-        }
     }
 
     fun getSelectedConfig(): ServerConfig? =
