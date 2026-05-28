@@ -1,4 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">TmVpn</string>
+    <string name="app_name">Telo VPN</string>
+    <string name="connect">BIRIKDIR</string>
+    <string name="disconnect">KES</string>
+    <string name="connecting">Birikdirilýär…</string>
+    <string name="connected">BIRIKDIRILDI</string>
+    <string name="idle">Taýyn</string>
+    <string name="loading">Serverler ýüklenýär…</string>
+    <string name="testing">Tizlikler ölçülýär…</string>
+    <string name="servers">Serverler</string>
+    <string name="settings">Sazlamalar</string>
+    <string name="home">Baş sahypa</string>
+    <string name="kill_switch">Kill Switch</string>
+    <string name="auto_connect">Açylanda birikdir</string>
+    <string name="retry">Gaýtala</string>
+    <string name="channel_name">VPN ýagdaýy</string>
 </resources>

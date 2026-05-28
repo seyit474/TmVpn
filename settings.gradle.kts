@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "TmVpn"
+rootProject.name = "TeloVpn"
 include(":app")
