@@ -28,23 +28,12 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Download libXray AAR
+      - name: Verify libXray AAR
         run: |
-          mkdir -p app/libs
-          # Önce doğrudan URL ile dene (API rate limit sorununu atlatır)
-          DIRECT_URL="https://github.com/2dust/AndroidLibXrayLite/releases/latest/download/libv2ray.aar"
-          if curl -fsSL -o app/libs/libXray.aar "$DIRECT_URL" 2>/dev/null; then
-            echo "libXray.aar indirildi (doğrudan URL)"
+          if [ -f app/libs/libXray.aar ]; then
+            echo "libXray.aar repoda mevcut ($(du -sh app/libs/libXray.aar | cut -f1))"
           else
-            # GitHub API fallback
-            echo "Doğrudan URL başarısız, GitHub API deneniyor..."
-            API_URL=$(curl -sf "https://api.github.com/repos/2dust/AndroidLibXrayLite/releases/latest" \
-              | python3 -c "import sys,json; assets=json.load(sys.stdin).get('assets',[]); print(next((a['browser_download_url'] for a in assets if a['name'].endswith('.aar')), ''))" 2>/dev/null || true)
-            if [ -n "$API_URL" ]; then
-              curl -fsSL -o app/libs/libXray.aar "$API_URL" && echo "libXray.aar indirildi (API)" || echo "API indirme başarısız — stub mode"
-            else
-              echo "AAR bulunamadı — stub mode (derleme devam eder, VPN tüneli çalışmaz)"
-            fi
+            echo "HATA: app/libs/libXray.aar bulunamadı!" && exit 1
           fi
 
       - name: Generate Gradle Wrapper if missing
