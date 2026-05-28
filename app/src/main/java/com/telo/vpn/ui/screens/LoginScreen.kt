@@ -56,7 +56,7 @@ fun KeyEntryScreen(vm: MainViewModel) {
             textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
         Text(
-            "Yöneticinizden aldığınız abonelik anahtarını buraya yapıştırın.",
+            "Yöneticinizden aldığınız anahtarı buraya yapıştırın.",
             fontSize = 13.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
@@ -68,7 +68,7 @@ fun KeyEntryScreen(vm: MainViewModel) {
             value = key,
             onValueChange = { key = it },
             label = { Text("Anahtar") },
-            placeholder = { Text("https://... veya token yapıştırın") },
+            placeholder = { Text("Anahtarınızı yapıştırın") },
             trailingIcon = {
                 IconButton(onClick = { keyVisible = !keyVisible }) {
                     Icon(

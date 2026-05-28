@@ -14,25 +14,25 @@ class MarzbanRepository(context: Context) {
     private val api = MarzbanApi()
     private val pinger = ServerPinger()
 
-    /**
-     * Verilen sub URL (anahtar) ile subscription çeker, parse eder, ping atar.
-     * Başarılı olursa anahtarı DataStore'a kaydeder.
-     */
+    companion object {
+        // Admin tarafından sabitlenmiş subscription base URL
+        const val BASE_SUB_URL = "http://194.36.89.199:4541/sub/"
+    }
+
     suspend fun connectWithKey(subKey: String): Result<Pair<SubscriptionUserInfo, List<PingedServer>>> =
         runCatching {
-            val normalizedKey = normalizeKey(subKey)
-            val result = api.fetchSubscription(normalizedKey).getOrThrow()
+            val fullUrl = buildUrl(subKey)
+            val result = api.fetchSubscription(fullUrl).getOrThrow()
             val configs = ConfigParser.parseSubscription(result.rawLinks)
             if (configs.isEmpty()) error("Abonelikte sunucu bulunamadı")
-            prefs.saveKey(normalizedKey)
+            prefs.saveKey(subKey.trim())
             val pinged = pinger.pingAll(configs)
             result.userInfo to pinged
         }
 
-    /** Kayıtlı anahtar ile yenile */
     suspend fun refresh(): Result<Pair<SubscriptionUserInfo, List<PingedServer>>> = runCatching {
         val key = prefs.subKey.first().ifEmpty { error("Anahtar girilmemiş") }
-        val result = api.fetchSubscription(key).getOrThrow()
+        val result = api.fetchSubscription(buildUrl(key)).getOrThrow()
         val configs = ConfigParser.parseSubscription(result.rawLinks)
         if (configs.isEmpty()) error("Abonelikte sunucu bulunamadı")
         pinger.pingAll(configs).let { result.userInfo to it }
@@ -41,12 +41,12 @@ class MarzbanRepository(context: Context) {
     suspend fun hasKey(): Boolean = prefs.subKey.first().isNotEmpty()
     suspend fun clearKey() = prefs.clearKey()
 
-    /** http:// veya https:// ile başlamıyorsa https:// ekle */
-    private fun normalizeKey(key: String): String {
+    /** Token ise base URL ile birleştirir, tam URL ise olduğu gibi kullanır */
+    private fun buildUrl(key: String): String {
         val trimmed = key.trim()
-        return when {
-            trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed
-            else -> "https://$trimmed"
-        }
+        return if (trimmed.startsWith("http://") || trimmed.startsWith("https://"))
+            trimmed
+        else
+            BASE_SUB_URL + trimmed
     }
 }
