@@ -159,7 +159,7 @@ class XrayVpnService : VpnService() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Telo VPN — $serverName")
             .setContentText(status)
-            .setSmallIcon(android.R.drawable.stat_sys_vpn_ic)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setOngoing(true)
             .setContentIntent(openPi)
             .addAction(android.R.drawable.ic_delete, "Kes", stopPi)
