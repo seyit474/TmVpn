@@ -84,7 +84,7 @@ fun SettingsScreen(vm: MainViewModel, prefs: AppPreferences) {
 
         if (hwidCopied) {
             Text(
-                "Göçürildi — Marzban-da bu HWID bilen ulanyjy dörediň",
+                "Göçürildi",
                 fontSize = 11.sp,
                 color = TeloGreen,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
@@ -132,7 +132,7 @@ fun SettingsScreen(vm: MainViewModel, prefs: AppPreferences) {
             icon = { Icon(Icons.Default.Code, contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant) },
             title = "Binýat",
-            value = "Xray-core + Marzban"
+            value = "Xray-core"
         )
     }
 }

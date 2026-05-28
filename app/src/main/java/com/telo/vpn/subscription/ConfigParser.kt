@@ -17,6 +17,31 @@ object ConfigParser {
             .toList()
     }
 
+    fun parseSubscriptionWithHwid(raw: String, hwidUuid: String): List<ServerConfig> =
+        parseSubscription(raw).map { config ->
+            when (config.protocol) {
+                ServerConfig.Protocol.VLESS, ServerConfig.Protocol.VMESS -> replaceUuid(config, hwidUuid)
+                else -> config
+            }
+        }
+
+    private fun replaceUuid(config: ServerConfig, uuid: String): ServerConfig {
+        val newRaw = when (config.protocol) {
+            ServerConfig.Protocol.VLESS ->
+                config.raw.replaceFirst(Regex("(?<=vless://)[^@]+(?=@)"), uuid)
+            ServerConfig.Protocol.VMESS -> {
+                val b64 = config.raw.removePrefix("vmess://").substringBefore("#")
+                val remark = config.raw.substringAfter("#", "")
+                val json = JSONObject(String(Base64.decode(b64, Base64.DEFAULT or Base64.URL_SAFE)))
+                json.put("id", uuid)
+                val newB64 = Base64.encodeToString(json.toString().toByteArray(), Base64.NO_WRAP)
+                "vmess://$newB64" + if (remark.isNotEmpty()) "#$remark" else ""
+            }
+            else -> config.raw
+        }
+        return config.copy(uuid = uuid, raw = newRaw)
+    }
+
     fun parseLink(link: String): ServerConfig? = runCatching {
         when {
             link.startsWith("vless://", true)   -> parseVless(link)
@@ -50,7 +75,6 @@ object ConfigParser {
             host = params["host"],
             serviceName = params["serviceName"],
             alpn = params["alpn"],
-            // XHTTP transport parametreleri
             xhttpMode = if (network == "xhttp") params["mode"] else null,
             xhttpExtra = if (network == "xhttp") params["extra"] else null,
             raw = link
@@ -115,7 +139,6 @@ object ConfigParser {
 
     // ─── Trojan ──────────────────────────────────────────────────────────────
     private fun parseTrojan(link: String): ServerConfig {
-        // trojan://password@host:port?security=tls&sni=...&fp=chrome&type=tcp#remark
         val uri = URI(link)
         val password = uri.userInfo ?: error("Trojan password yok")
         val host = uri.host ?: error("Trojan host yok")
@@ -138,7 +161,7 @@ object ConfigParser {
         )
     }
 
-    // ─── Yardımcılar ─────────────────────────────────────────────────────────
+    // ─── Helpers ─────────────────────────────────────────────────────────────
     private fun parseQuery(query: String): Map<String, String> {
         if (query.isEmpty()) return emptyMap()
         return query.split("&").mapNotNull {

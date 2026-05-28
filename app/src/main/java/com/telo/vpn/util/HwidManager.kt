@@ -17,6 +17,10 @@ object HwidManager {
         return getFallbackId(context)
     }
 
+    // Deterministic UUID from HWID — same device always gets the same UUID
+    fun getHwidAsUuid(context: Context): String =
+        UUID.nameUUIDFromBytes(getHwid(context).toByteArray()).toString()
+
     private fun getFallbackId(context: Context): String {
         val prefs = context.getSharedPreferences("hwid", Context.MODE_PRIVATE)
         var id = prefs.getString("id", null)

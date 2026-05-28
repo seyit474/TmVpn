@@ -4,7 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.telo.vpn.api.SubscriptionUserInfo
-import com.telo.vpn.data.MarzbanRepository
+import com.telo.vpn.data.VpnRepository
 import com.telo.vpn.model.ConnectionState
 import com.telo.vpn.model.ServerConfig
 import com.telo.vpn.model.TrafficStats
@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
 
-    private val repo = MarzbanRepository(app)
+    private val repo = VpnRepository(app)
 
     val hwid: String get() = repo.getHwid()
 

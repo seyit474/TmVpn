@@ -4,7 +4,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
-class MarzbanApi {
+class SubscriptionApi {
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -12,10 +12,6 @@ class MarzbanApi {
         .followRedirects(true)
         .build()
 
-    /**
-     * Subscription URL'den hem kullanıcı bilgisini (header'dan) hem link listesini çeker.
-     * URL tam subscription URL olmalı: https://panel.example.com/sub/{token}
-     */
     suspend fun fetchSubscription(subUrl: String): Result<SubscriptionResult> = runCatching {
         val req = Request.Builder()
             .url(subUrl)
@@ -32,9 +28,6 @@ class MarzbanApi {
         }
     }
 
-    /**
-     * "upload=0; download=1234; total=10737418240; expire=1735689600" → SubscriptionUserInfo
-     */
     private fun parseUserInfoHeader(header: String): SubscriptionUserInfo {
         if (header.isBlank()) return SubscriptionUserInfo()
         val map = header.split(";")
