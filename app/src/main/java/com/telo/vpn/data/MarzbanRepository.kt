@@ -25,7 +25,7 @@ class MarzbanRepository(private val context: Context) {
             val url = BASE_SUB_URL + getHwid()
             val result = api.fetchSubscription(url).getOrThrow()
             val configs = ConfigParser.parseSubscription(result.rawLinks)
-            if (configs.isEmpty()) error("Abonelikte sunucu bulunamadı")
+            if (configs.isEmpty()) error("Abonementde server tapylmady")
             pinger.pingAll(configs).let { result.userInfo to it }
         }
 

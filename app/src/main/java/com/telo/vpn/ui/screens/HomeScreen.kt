@@ -46,7 +46,6 @@ fun HomeScreen(
     ) {
         Spacer(Modifier.height(24.dp))
 
-        // Başlık
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -60,7 +59,7 @@ fun HomeScreen(
             )
             if (connState is ConnectionState.Ready || connState is ConnectionState.Error) {
                 IconButton(onClick = { vm.loadServers() }) {
-                    Icon(Icons.Default.Refresh, contentDescription = "Yenile",
+                    Icon(Icons.Default.Refresh, contentDescription = "Täzele",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -68,17 +67,14 @@ fun HomeScreen(
 
         Spacer(Modifier.height(8.dp))
 
-        // Kullanıcı bilgi kartı
         UserInfoCard(userInfo)
 
         Spacer(Modifier.height(8.dp))
 
-        // Durum metni
         StatusText(connState, isConnected)
 
         Spacer(Modifier.height(40.dp))
 
-        // Ana bağlan butonu
         ConnectButton(
             state = connState,
             isConnected = isConnected,
@@ -88,7 +84,6 @@ fun HomeScreen(
 
         Spacer(Modifier.height(32.dp))
 
-        // Bağlı sunucu gösterimi
         when {
             isConnected && connState is ConnectionState.Connected -> {
                 val cfg = (connState as ConnectionState.Connected).server
@@ -119,7 +114,7 @@ fun HomeScreen(
 
 @Composable
 private fun UserInfoCard(info: SubscriptionUserInfo) {
-    if (info.daysLeft == -1 && info.isUnlimited) return  // hiç bilgi yok
+    if (info.daysLeft == -1 && info.isUnlimited) return
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -131,19 +126,17 @@ private fun UserInfoCard(info: SubscriptionUserInfo) {
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Kalan gün
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = if (info.daysLeft == -1) "∞" else "${info.daysLeft}",
                     fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TeloGreen
                 )
-                Text("gün kaldı", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("gün galdy", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
             VerticalDivider(modifier = Modifier.height(40.dp),
                 color = MaterialTheme.colorScheme.outline)
 
-            // Kalan veri
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 if (info.isUnlimited) {
                     Text("∞", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TeloGreen)
@@ -158,27 +151,26 @@ private fun UserInfoCard(info: SubscriptionUserInfo) {
                         }
                     )
                 }
-                Text("kalan veri", fontSize = 11.sp,
+                Text("galan maglumat", fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
             VerticalDivider(modifier = Modifier.height(40.dp),
                 color = MaterialTheme.colorScheme.outline)
 
-            // Kullanılan / Toplam
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = formatBytes(info.usedBytes),
                     fontSize = 16.sp, fontWeight = FontWeight.Bold
                 )
-                Text("kullanıldı", fontSize = 11.sp,
+                Text("ulanylan", fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
         if (info.isExpired) {
             Text(
-                "Aboneliğinizin süresi dolmuş",
+                "Aboneligiňiziň möhleti doldy",
                 color = TeloError,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
@@ -190,16 +182,16 @@ private fun UserInfoCard(info: SubscriptionUserInfo) {
 @Composable
 private fun StatusText(state: ConnectionState, isConnected: Boolean) {
     val (text, color) = when {
-        isConnected -> "Bağlandı" to TeloGreen
-        state is ConnectionState.Connecting -> "Bağlanıyor..." to TeloWarning
-        state is ConnectionState.Loading -> "Sunucular yükleniyor..." to TeloOnSurfaceVariant
-        state is ConnectionState.Testing -> "Hızlar ölçülüyor..." to TeloOnSurfaceVariant
+        isConnected -> "Birikdirildi" to TeloGreen
+        state is ConnectionState.Connecting -> "Birikdirilýär..." to TeloWarning
+        state is ConnectionState.Loading -> "Serverler ýüklenýär..." to TeloOnSurfaceVariant
+        state is ConnectionState.Testing -> "Tizlikler ölçülýär..." to TeloOnSurfaceVariant
         state is ConnectionState.Ready -> {
             val s = state as ConnectionState.Ready
-            "Hazır — ${s.selected.remark}" to TeloOnSurfaceVariant
+            "Taýyn — ${s.selected.remark}" to TeloOnSurfaceVariant
         }
-        state is ConnectionState.Error -> "Hata" to TeloError
-        else -> "Bağlı değil" to TeloOnSurfaceVariant
+        state is ConnectionState.Error -> "Ýalňyşlyk" to TeloError
+        else -> "Birikdirilmedi" to TeloOnSurfaceVariant
     }
     Text(text = text, color = color, fontSize = 14.sp)
 }
@@ -267,7 +259,7 @@ private fun ConnectButton(
             } else {
                 val label = when {
                     isConnected -> "KES"
-                    state is ConnectionState.Ready -> "BAĞLAN"
+                    state is ConnectionState.Ready -> "BIRIKDIR"
                     else -> "..."
                 }
                 Text(
@@ -320,7 +312,7 @@ private fun SelectedServerCard(serverName: String, protocol: String, latency: Lo
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Seçili sunucu", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                Text("Saýlanan server", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                 Text(serverName, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
                 Text(protocol, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
             }
@@ -392,15 +384,15 @@ private fun ErrorCard(message: String, onRetry: () -> Unit) {
             Text(message, color = MaterialTheme.colorScheme.onErrorContainer, fontSize = 13.sp,
                 textAlign = TextAlign.Center)
             Spacer(Modifier.height(12.dp))
-            OutlinedButton(onClick = onRetry) { Text("Tekrar Dene") }
+            OutlinedButton(onClick = onRetry) { Text("Gaýtala") }
         }
     }
 }
 
 @Composable
 private fun LoadingCard(state: ConnectionState) {
-    val text = if (state is ConnectionState.Loading) "Sunucular yükleniyor..."
-               else "Hızlar ölçülüyor..."
+    val text = if (state is ConnectionState.Loading) "Serverler ýüklenýär..."
+               else "Tizlikler ölçülýär..."
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)

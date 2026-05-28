@@ -39,9 +39,9 @@ fun ServerListScreen(vm: MainViewModel) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Sunucular", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text("Serverler", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             IconButton(onClick = { vm.loadServers() }) {
-                Icon(Icons.Default.Refresh, contentDescription = "Yenile")
+                Icon(Icons.Default.Refresh, contentDescription = "Täzele")
             }
         }
 
@@ -51,7 +51,7 @@ fun ServerListScreen(vm: MainViewModel) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator(color = TeloGreen)
                         Spacer(Modifier.height(12.dp))
-                        Text("Sunucular yükleniyor...",
+                        Text("Serverler ýüklenýär...",
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -61,7 +61,7 @@ fun ServerListScreen(vm: MainViewModel) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator(color = TeloGreen)
                         Spacer(Modifier.height(12.dp))
-                        Text("Hızlar ölçülüyor...",
+                        Text("Tizlikler ölçülýär...",
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -90,13 +90,13 @@ fun ServerListScreen(vm: MainViewModel) {
                         Text(s.message, color = MaterialTheme.colorScheme.error,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                         Spacer(Modifier.height(16.dp))
-                        Button(onClick = { vm.loadServers() }) { Text("Tekrar Dene") }
+                        Button(onClick = { vm.loadServers() }) { Text("Gaýtala") }
                     }
                 }
             }
             else -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Sunucu listesi yüklenmedi",
+                    Text("Server sanawy ýüklenmedik",
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -122,7 +122,6 @@ private fun ServerRow(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Ping renk göstergesi
             Box(
                 modifier = Modifier
                     .size(10.dp)

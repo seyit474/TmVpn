@@ -53,11 +53,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     _connState.value = if (best != null)
                         ConnectionState.Ready(servers, best.config)
                     else
-                        ConnectionState.Error("Erişilebilir sunucu bulunamadı")
+                        ConnectionState.Error("Elýeter server tapylmady")
                 }
                 .onFailure {
                     _connState.value = ConnectionState.Error(
-                        it.message ?: "Bağlantı hatası — HWID: $hwid"
+                        it.message ?: "Birikdirme ýalňyşlygy — HWID: $hwid"
                     )
                 }
         }

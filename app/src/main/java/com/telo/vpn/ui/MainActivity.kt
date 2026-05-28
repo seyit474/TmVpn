@@ -140,7 +140,7 @@ private enum class NavItem(
     val label: String,
     val icon: androidx.compose.ui.graphics.vector.ImageVector
 ) {
-    HOME("home", "Ana Sayfa", Icons.Default.Home),
-    SERVERS("servers", "Sunucular", Icons.Default.List),
-    SETTINGS("settings", "Ayarlar", Icons.Default.Settings)
+    HOME("home", "Baş sahypa", Icons.Default.Home),
+    SERVERS("servers", "Serverler", Icons.Default.List),
+    SETTINGS("settings", "Sazlamalar", Icons.Default.Settings)
 }

@@ -32,11 +32,11 @@ fun SettingsScreen(vm: MainViewModel, prefs: AppPreferences) {
     ) {
         Spacer(Modifier.height(16.dp))
         Text(
-            "Ayarlar", fontSize = 20.sp, fontWeight = FontWeight.Bold,
+            "Sazlamalar", fontSize = 20.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
         )
 
-        SectionHeader("Cihaz")
+        SectionHeader("Enjam")
 
         // HWID kartı
         Card(
@@ -59,7 +59,7 @@ fun SettingsScreen(vm: MainViewModel, prefs: AppPreferences) {
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Cihaz HWID", fontSize = 11.sp,
+                    Text("Enjam HWID", fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
                         vm.hwid,
@@ -84,7 +84,7 @@ fun SettingsScreen(vm: MainViewModel, prefs: AppPreferences) {
 
         if (hwidCopied) {
             Text(
-                "Kopyalandı — Marzban'da bu HWID ile kullanıcı oluşturun",
+                "Göçürildi — Marzban-da bu HWID bilen ulanyjy dörediň",
                 fontSize = 11.sp,
                 color = TeloGreen,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
@@ -97,7 +97,7 @@ fun SettingsScreen(vm: MainViewModel, prefs: AppPreferences) {
         ToggleRow(
             icon = { Icon(Icons.Default.Shield, contentDescription = null, tint = TeloGreen) },
             title = "Kill Switch",
-            subtitle = "VPN kesildiğinde internet bağlantısını kes",
+            subtitle = "VPN kesilende internet birikdirmesini kes",
             checked = killSwitch,
             onCheckedChange = { vm.setKillSwitch(it) }
         )
@@ -107,19 +107,19 @@ fun SettingsScreen(vm: MainViewModel, prefs: AppPreferences) {
         ToggleRow(
             icon = { Icon(Icons.Default.PowerSettingsNew, contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-            title = "Önyüklemede Bağlan",
-            subtitle = "Cihaz açıldığında otomatik VPN bağlantısı kur",
+            title = "Açylanda birikdir",
+            subtitle = "Enjam açylanda awtomatik VPN birikdirmesini gur",
             checked = autoConnect,
             onCheckedChange = { vm.setAutoConnect(it) }
         )
 
         Spacer(Modifier.height(24.dp))
-        SectionHeader("Uygulama")
+        SectionHeader("Goşundy")
 
         InfoRow(
             icon = { Icon(Icons.Default.Info, contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-            title = "Versiyon",
+            title = "Wersiýa",
             value = "2.0.0"
         )
         InfoRow(
@@ -131,7 +131,7 @@ fun SettingsScreen(vm: MainViewModel, prefs: AppPreferences) {
         InfoRow(
             icon = { Icon(Icons.Default.Code, contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-            title = "Altyapı",
+            title = "Binýat",
             value = "Xray-core + Marzban"
         )
     }
