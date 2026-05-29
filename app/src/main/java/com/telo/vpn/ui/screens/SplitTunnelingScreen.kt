@@ -3,7 +3,6 @@ package com.telo.vpn.ui.screens
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -191,8 +190,11 @@ private fun AppRow(app: AppInfo, checked: Boolean, onToggle: (Boolean) -> Unit) 
     ) {
         Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
             if (iconBitmap != null) {
-                Image(bitmap = iconBitmap!!, contentDescription = null,
-                    modifier = Modifier.size(36.dp))
+                androidx.compose.foundation.Image(
+                    bitmap = iconBitmap!!,
+                    contentDescription = null,
+                    modifier = Modifier.size(36.dp)
+                )
             } else {
                 Icon(Icons.Default.Android, contentDescription = null,
                     modifier = Modifier.size(28.dp),
