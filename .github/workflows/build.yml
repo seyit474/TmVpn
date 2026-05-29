@@ -2,7 +2,7 @@ name: Build TeloWG APK
 
 on:
   push:
-    branches: [ main, "release/*" ]
+    branches: [ main, "release/*", "claude/*" ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
