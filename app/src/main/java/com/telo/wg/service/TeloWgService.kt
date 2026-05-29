@@ -18,10 +18,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import org.amnezia.awg.backend.GoBackend
-import org.amnezia.awg.backend.Tunnel
-import org.amnezia.awg.backend.TunnelActionHandler
-import org.amnezia.awg.config.Config
+import com.zaneschepke.amneziawg.backend.GoBackend
+import com.zaneschepke.amneziawg.backend.Tunnel
+import com.zaneschepke.amneziawg.backend.TunnelActionHandler
+import com.zaneschepke.amneziawg.config.Config
 
 class TeloWgService : VpnService() {
 
