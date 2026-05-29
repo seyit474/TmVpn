@@ -13,19 +13,18 @@ interface XrayCoreEngine {
 }
 
 /**
- * Gerçek motor — libXray.aar (AndroidLibXrayLite) ile çalışır.
- * Reflection kullanılır; AAR olmadan da derlenir.
- *
- * Mevcut API (gomobile static methods on libv2ray.Libv2ray):
- *   initCoreEnv(dataDir: String, logDir: String)
- *   startLoop(configPath: String, tunFd: Int): Boolean
- *   stopLoop()
- *   queryStats(tag: String, direct: String): Long
- *   checkVersionX(): String
+ * Gerçek API (libv2ray.aar içinden javap ile doğrulandı):
+ *   Libv2ray.newCoreController(CoreCallbackHandler) → CoreController
+ *   CoreController.startLoop(String configPath, int tunFd) throws Exception
+ *   CoreController.stopLoop() throws Exception
+ *   CoreController.queryStats(String tag, String direction) → Long
+ *   CoreController.getIsRunning() → Boolean
+ *   Libv2ray.initCoreEnv(String dataDir, String logDir)
+ *   Libv2ray.checkVersionX() → String
  */
 class LibXrayEngine(private val service: VpnService) : XrayCoreEngine {
 
-    private var running = false
+    private var controller: Any? = null  // CoreController instance
 
     companion object {
         private const val TAG = "TeloVPN/Xray"
@@ -35,84 +34,84 @@ class LibXrayEngine(private val service: VpnService) : XrayCoreEngine {
             if (initialized) return
             runCatching {
                 val lib = Class.forName("libv2ray.Libv2ray")
-                // Mevcut API metodlarını logla — hangi imzanın çalışacağını görmek için
-                lib.methods.forEach {
-                    Log.d(TAG, "API: ${it.name}(${it.parameterTypes.joinToString { p -> p.simpleName }})")
-                }
                 lib.getMethod("initCoreEnv", String::class.java, String::class.java)
-                    .invoke(null, context.filesDir.absolutePath, "")
+                    .invoke(null, context.filesDir.absolutePath, context.filesDir.absolutePath)
                 initialized = true
                 val ver = runCatching {
                     lib.getMethod("checkVersionX").invoke(null) as String
                 }.getOrDefault("?")
                 Log.i(TAG, "Xray env hazır — $ver")
-            }.onFailure { Log.e(TAG, "initEnv: ${it.message}") }
+            }.onFailure { Log.e(TAG, "initEnv başarısız: ${it.message}") }
         }
     }
 
     override fun start(configJson: String, tunFd: Int): Boolean {
         return runCatching {
             val lib = Class.forName("libv2ray.Libv2ray")
+            val callbackClass = Class.forName("libv2ray.CoreCallbackHandler")
+            val controllerClass = Class.forName("libv2ray.CoreController")
 
-            // Config JSON dosyaya yaz (Xray genellikle dosya yolu bekler)
+            // Config JSON → dosyaya yaz
             val configFile = File(service.filesDir, "xray_config.json")
             configFile.writeText(configJson)
-            val configPath = configFile.absolutePath
 
-            val ok = tryStartLoop(lib, configPath, configJson, tunFd)
-            if (ok) { running = true; Log.i(TAG, "Xray başlatıldı (fd=$tunFd)") }
-            else Log.e(TAG, "Tüm startLoop imzaları başarısız — logcat'te 'API:' satırlarını kontrol et")
-            ok
+            // CoreCallbackHandler proxy oluştur (Java dynamic proxy)
+            val handler = java.lang.reflect.Proxy.newProxyInstance(
+                callbackClass.classLoader,
+                arrayOf(callbackClass)
+            ) { _, method, args ->
+                when (method.name) {
+                    "startup"        -> { Log.i(TAG, "Xray startup"); 0L }
+                    "shutdown"       -> { Log.i(TAG, "Xray shutdown"); 0L }
+                    "onEmitStatus"   -> {
+                        val status = args?.getOrNull(1) as? String ?: ""
+                        Log.d(TAG, "Xray status: $status")
+                        0L
+                    }
+                    else -> null
+                }
+            }
+
+            // newCoreController(handler) → CoreController
+            val ctrl = lib.getMethod("newCoreController", callbackClass)
+                .invoke(null, handler)
+            controller = ctrl
+
+            // startLoop(configPath, tunFd)
+            controllerClass.getMethod("startLoop", String::class.java, Int::class.javaPrimitiveType)
+                .invoke(ctrl, configFile.absolutePath, tunFd)
+
+            Log.i(TAG, "Xray başlatıldı (fd=$tunFd, config=${configFile.absolutePath})")
+            true
         }.onFailure { e ->
             Log.e(TAG, "start hatası: ${e.javaClass.simpleName}: ${e.message}", e)
         }.getOrDefault(false)
     }
 
-    /**
-     * Farklı imzaları sırayla dener.
-     * Hem dosya yolu hem raw JSON string denenir; int ve long fd parametresi denenir.
-     */
-    private fun tryStartLoop(lib: Class<*>, configPath: String, configJson: String, fd: Int): Boolean {
-        // 1) startLoop(String configPath, int fd)
-        runCatching {
-            return lib.getMethod("startLoop", String::class.java, Int::class.javaPrimitiveType)
-                .invoke(null, configPath, fd) as? Boolean ?: true
-        }
-        // 2) startLoop(String configPath, long fd)
-        runCatching {
-            return lib.getMethod("startLoop", String::class.java, Long::class.javaPrimitiveType)
-                .invoke(null, configPath, fd.toLong()) as? Boolean ?: true
-        }
-        // 3) startLoop(String configJson, int fd) — raw JSON string
-        runCatching {
-            return lib.getMethod("startLoop", String::class.java, Int::class.javaPrimitiveType)
-                .invoke(null, configJson, fd) as? Boolean ?: true
-        }
-        // 4) startXray(String configPath, int fd) — alternatif metod adı
-        runCatching {
-            lib.getMethod("startXray", String::class.java, Int::class.javaPrimitiveType)
-                .invoke(null, configPath, fd)
-            return true
-        }
-        return false
-    }
-
     override fun stop() {
-        running = false
         runCatching {
-            val lib = Class.forName("libv2ray.Libv2ray")
-            runCatching { lib.getMethod("stopLoop").invoke(null) }
-            runCatching { lib.getMethod("stopXray").invoke(null) }
-        }
+            val controllerClass = Class.forName("libv2ray.CoreController")
+            controller?.let {
+                controllerClass.getMethod("stopLoop").invoke(it)
+            }
+        }.onFailure { Log.e(TAG, "stop hatası: ${it.message}") }
+        controller = null
         Log.i(TAG, "Xray durduruldu")
     }
 
-    override fun isRunning(): Boolean = running
+    override fun isRunning(): Boolean = runCatching {
+        val controllerClass = Class.forName("libv2ray.CoreController")
+        controller?.let {
+            controllerClass.getMethod("getIsRunning").invoke(it) as? Boolean
+        } ?: false
+    }.getOrDefault(false)
 
     override fun queryStats(tag: String, uplink: Boolean): Long = runCatching {
-        Class.forName("libv2ray.Libv2ray")
-            .getMethod("queryStats", String::class.java, String::class.java)
-            .invoke(null, tag, if (uplink) "uplink" else "downlink") as? Long
+        val controllerClass = Class.forName("libv2ray.CoreController")
+        controller?.let {
+            controllerClass.getMethod("queryStats", String::class.java, String::class.java)
+                .invoke(it, tag, if (uplink) "uplink" else "downlink") as? Long
+        } ?: 0L
     }.getOrDefault(0L) ?: 0L
 }
 
