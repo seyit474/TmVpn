@@ -1,10 +1,11 @@
 package com.seyit474.tmvpn.subscription
 
-import android.util.Base64
 import com.seyit474.tmvpn.model.ServerConfig
 import org.json.JSONObject
 import java.net.URI
 import java.net.URLDecoder
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * VLESS/VMess/Shadowsocks linklerini ServerConfig'e dönüştürür.
@@ -14,6 +15,9 @@ import java.net.URLDecoder
  *  - vmess://BASE64({"v":"2","ps":"...","add":"...","port":"...","id":"...","aid":"0","net":"ws","type":"none","host":"...","path":"/","tls":"tls"})
  *  - ss://BASE64(method:password)@host:port#remark   (modern format)
  *  - ss://BASE64(method:password@host:port)#remark   (eski format)
+ *
+ * Base64 için Kotlin stdlib kullanılır (android.util.Base64 değil) —
+ * böylece parser saf JVM unit testleriyle doğrulanabilir.
  */
 object ConfigParser {
 
@@ -41,7 +45,7 @@ object ConfigParser {
         // vless://uuid@host:port?params#remark
         val uri = URI(link)
         val uuid = uri.userInfo ?: error("VLESS uuid yok")
-        val host = uri.host ?: error("VLESS host yok")
+        val host = uri.host?.removeSurrounding("[", "]") ?: error("VLESS host yok")
         val port = uri.port.takeIf { it > 0 } ?: error("VLESS port yok")
         val params = parseQuery(uri.rawQuery ?: "")
         val remark = decodeFragment(uri.fragment) ?: "$host:$port"
@@ -70,7 +74,7 @@ object ConfigParser {
     // ---------- VMess ----------
     private fun parseVmess(link: String): ServerConfig {
         val b64 = link.removePrefix("vmess://").substringBefore("#")
-        val json = JSONObject(String(Base64.decode(b64, Base64.DEFAULT or Base64.URL_SAFE)))
+        val json = JSONObject(decodeBase64ToString(b64))
         val host = json.getString("add")
         val port = json.getString("port").toInt()
         return ServerConfig(
@@ -101,12 +105,10 @@ object ConfigParser {
         // Eski format:   BASE64(method:password@host:port)
         val (userInfo, hostPort) = if (main.contains("@")) {
             val parts = main.split("@", limit = 2)
-            val ui = runCatching {
-                String(Base64.decode(parts[0], Base64.DEFAULT or Base64.URL_SAFE))
-            }.getOrDefault(parts[0])
+            val ui = runCatching { decodeBase64ToString(parts[0]) }.getOrDefault(parts[0])
             ui to parts[1]
         } else {
-            val decoded = String(Base64.decode(main, Base64.DEFAULT or Base64.URL_SAFE))
+            val decoded = decodeBase64ToString(main)
             val parts = decoded.split("@", limit = 2)
             parts[0] to parts[1]
         }
@@ -141,10 +143,24 @@ object ConfigParser {
     private fun decodeFragment(f: String?): String? =
         f?.let { runCatching { URLDecoder.decode(it, "UTF-8") }.getOrDefault(it) }
 
+    /**
+     * URL-safe / padding'siz varyantları da kabul eden esnek base64 decode.
+     * Subscription üreticileri bu konuda tutarsız olabiliyor.
+     */
+    @OptIn(ExperimentalEncodingApi::class)
+    private fun decodeBase64ToString(s: String): String {
+        val normalized = s.trim()
+            .replace('-', '+')
+            .replace('_', '/')
+            .replace("\r", "")
+            .replace("\n", "")
+        val padded = normalized + "=".repeat((4 - normalized.length % 4) % 4)
+        return Base64.decode(padded).decodeToString()
+    }
+
     private fun tryBase64Decode(s: String): String? = runCatching {
         // Subscription'lar genelde tüm cevabı base64'ler
-        String(Base64.decode(s, Base64.DEFAULT or Base64.URL_SAFE or Base64.NO_WRAP))
-            .takeIf { it.contains("://") }
+        decodeBase64ToString(s).takeIf { it.contains("://") }
     }.getOrNull()
 
     private fun stableId(s: String): String =

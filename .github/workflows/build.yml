@@ -36,6 +36,11 @@ jobs:
           fi
           chmod +x gradlew
 
+      - name: Run Unit Tests
+        env:
+          SUBSCRIPTION_URL: ${{ secrets.SUBSCRIPTION_URL }}
+        run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
+
       - name: Build Debug APK
         env:
           SUBSCRIPTION_URL: ${{ secrets.SUBSCRIPTION_URL }}

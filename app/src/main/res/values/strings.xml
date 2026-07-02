@@ -1,4 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">TmVpn</string>
+
+    <!-- Eylemler -->
+    <string name="action_connect">BAĞLAN</string>
+    <string name="action_disconnect">KES</string>
+    <string name="action_retry">Tekrar dene</string>
+    <string name="action_refresh">Sunucuları yenile</string>
+
+    <!-- Durum etiketleri -->
+    <string name="status_idle">Hazır</string>
+    <string name="status_fetching">Sunucular alınıyor…</string>
+    <string name="status_testing">Hızlar ölçülüyor…</string>
+    <string name="status_ready">En hızlı: %1$s</string>
+    <string name="status_connecting">Bağlanıyor…</string>
+    <string name="status_connected">Bağlı · %1$s</string>
+    <string name="status_no_selection">Sunucu seçilmedi</string>
+
+    <!-- Sunucu listesi -->
+    <string name="servers_header">Sunucular (%1$d)</string>
+    <string name="latency_ms">%1$d ms</string>
+    <string name="latency_unreachable">—</string>
+
+    <!-- Hatalar -->
+    <string name="error_missing_url">Abonelik adresi yapılandırılmamış (SUBSCRIPTION_URL)</string>
+    <string name="error_no_servers">Abonelikte sunucu bulunamadı</string>
+    <string name="error_no_reachable">Hiçbir sunucuya ulaşılamadı</string>
+    <string name="error_network">İnternet bağlantısı yok ya da sunucuya erişilemiyor</string>
+    <string name="error_timeout">Bağlantı zaman aşımına uğradı</string>
+    <string name="error_http">Sunucu hatası (HTTP %1$d)</string>
+    <string name="error_unknown">Beklenmeyen hata: %1$s</string>
+    <string name="error_core_missing">VPN çekirdeği (libXray) bu sürümde henüz paketlenmedi</string>
+    <string name="error_tun_failed">VPN arayüzü oluşturulamadı</string>
+
+    <!-- Bildirim -->
+    <string name="notif_channel_name">VPN Durumu</string>
+    <string name="notif_connecting">Bağlanıyor…</string>
+    <string name="notif_connected">%1$s üzerinden bağlı</string>
+    <string name="notif_action_disconnect">Bağlantıyı kes</string>
 </resources>

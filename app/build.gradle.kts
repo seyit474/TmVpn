@@ -11,8 +11,8 @@ android {
         applicationId = "com.seyit474.tmvpn"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
 
         // Subscription URL — GitHub Actions'ta SUBSCRIPTION_URL secret'ından gelir.
         val subUrl: String = System.getenv("SUBSCRIPTION_URL")
@@ -82,8 +82,10 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.2")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.2")
     implementation("androidx.activity:activity-compose:1.9.0")
 
     // Coroutines
@@ -98,4 +100,12 @@ dependencies {
 
     // DataStore (ayarlar için)
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // libXray.aar buraya konduğunda otomatik derlemeye girer (bkz. README)
+    implementation(fileTree("libs") { include("*.aar", "*.jar") })
+
+    // Unit test — parser ve config builder JVM'de test edilir
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 }

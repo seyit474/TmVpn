@@ -1,125 +1,134 @@
-# TmVpn — Android VPN Uygulaması
+# TmVpn
 
-Xray çekirdeği üzerinde VLESS / VMess / Shadowsocks destekleyen,
-abonelik tabanlı, otomatik en hızlı sunucu seçen Android uygulaması.
+[![Build](https://github.com/seyit474/TmVpn/actions/workflows/build.yml/badge.svg)](https://github.com/seyit474/TmVpn/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/seyit474/TmVpn?include_prereleases)](https://github.com/seyit474/TmVpn/releases)
 
-## Tamamlanan (Aşama 1)
+Xray çekirdeği üzerinde **VLESS / VMess / Shadowsocks** destekleyen, abonelik
+tabanlı, otomatik en hızlı sunucuyu seçen Android VPN istemcisi.
 
-- ✅ Gradle yapılandırması (Kotlin + Compose + AGP 8.5)
-- ✅ `ServerConfig` ortak veri modeli
-- ✅ `ConfigParser` — VLESS / VMess / Shadowsocks link parser
-  - VLESS REALITY parametreleri (pbk, sid, fp, sni, flow)
-  - VMess JSON base64
-  - Shadowsocks (modern + eski format)
-  - Subscription base64 otomatik decode
-- ✅ `SubscriptionFetcher` — OkHttp ile abonelik çekme
-- ✅ `ServerPinger` — paralel TCP handshake latency ölçümü
-- ✅ `XrayConfigBuilder` — Xray-core JSON üretici (SOCKS 10808 + DNS 10853)
-- ✅ `VpnViewModel` — UI state machine
-- ✅ Compose UI — büyük yuvarlak BAĞLAN butonu + sunucu listesi (renkli ping)
-- ✅ `XrayVpnService` iskeleti
+## Özellikler
 
-## Sonraki Adım: Aşama 2 — Xray entegrasyonu
+- 🔗 **Abonelik tabanlı** — sunucu listesi tek bir URL'den çekilir,
+  base64 kodlu ve düz metin subscription formatları desteklenir
+- ⚡ **Otomatik en hızlı sunucu** — tüm sunuculara paralel TCP handshake
+  ölçümü yapılır, en düşük gecikmeli sunucu otomatik seçilir
+- 🛡️ **VLESS REALITY** — pbk / sid / fp / sni / flow (xtls-rprx-vision) dahil
+- 🌐 **VMess** (ws / grpc / tcp) ve **Shadowsocks** (modern + eski link formatı)
+- 🎨 **Modern arayüz** — Jetpack Compose + Material 3, koyu tema,
+  splash ekranı, canlı bağlantı durumu
+- 🔔 **Kalıcı bildirim** — bağlantı durumu ve tek dokunuşla kesme aksiyonu
+- 🚫 **Reklam engelleme** — `geosite:category-ads-all` yönlendirme kuralı
 
-Bu üç parça gerekiyor:
+## Durum
 
-### 1. libXray.aar derleme
+| Bileşen | Durum |
+|---|---|
+| Subscription çekme + parse (VLESS/VMess/SS) | ✅ Hazır |
+| Paralel TCP ping + en hızlı sunucu seçimi | ✅ Hazır |
+| Compose UI (bağlan/kes, sunucu listesi, hata akışı) | ✅ Hazır |
+| Xray JSON config üretimi | ✅ Hazır |
+| VpnService (tun + bildirim + durum köprüsü) | ✅ Hazır |
+| Unit testler (parser + config builder) | ✅ Hazır |
+| **libXray çekirdeği (gerçek tünel)** | 🚧 Bekliyor |
+| tun2socks entegrasyonu | 🚧 Bekliyor |
 
-Xray-core'u Android için derlemek lazım. İki yol var:
+> Çekirdek paketlenmediği sürece uygulama dürüst davranır: BAĞLAN'a
+> basıldığında tünel kurulmaz ve kullanıcıya açık bir hata gösterilir.
+> "Sahte bağlı" durumu asla oluşmaz.
 
-**A) Hazır AAR kullan (önerilir):**
-- `github.com/2dust/AndroidLibXrayLite` reposundan releases altındaki AAR
-- Veya `github.com/xtls/libxray` (resmi)
-- `app/libs/libXray.aar` olarak koy, gradle'a ekle:
-  ```kotlin
-  implementation(files("libs/libXray.aar"))
-  ```
+## Derleme
 
-**B) Kendin derle:**
-- Linux makinede:
-  ```bash
-  git clone https://github.com/xtls/libxray
-  cd libxray
-  # Go 1.21+ ve gomobile gerekli
-  go install golang.org/x/mobile/cmd/gomobile@latest
-  gomobile init
-  gomobile bind -target=android -androidapi=24 \
-    -o libXray.aar github.com/xtls/libxray
-  ```
+### GitHub Actions (önerilir)
 
-### 2. tun2socks
+Her `main` push'unda debug APK otomatik derlenir ve *Actions → Artifacts*
+altına yüklenir. `v*` tag'i atıldığında imzalı release APK üretilir.
 
-Tun arayüzü trafiğini SOCKS proxy'ye yönlendirmek için:
-- `hev-socks5-tunnel` (önerilir, en hızlı) — `github.com/heiher/hev-socks5-tunnel`
-- Önceden derlenmiş `.so` dosyaları için: `2dust/AndroidLibXrayLite`'taki releases
+Gerekli repository secrets:
 
-`.so` dosyalarını `app/src/main/jniLibs/{arm64-v8a,armeabi-v7a,x86_64}/` altına koy.
+| Secret | Açıklama |
+|---|---|
+| `SUBSCRIPTION_URL` | Abonelik endpoint'i (zorunlu) |
+| `KEYSTORE_BASE64` | Release keystore (base64) — imzalı APK için |
+| `KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD` | Keystore bilgileri |
 
-### 3. JNI bağlama
+### Lokal
 
-`XrayVpnService.kt` içindeki TODO'ları doldur:
-```kotlin
-import libv2ray.Libv2ray   // libXray.aar paketi
+```bash
+# SUBSCRIPTION_URL'i ortam değişkeni ya da gradle property olarak ver
+SUBSCRIPTION_URL="https://..." ./gradlew assembleDebug
 
-val v2rayPoint = Libv2ray.newV2RayPoint(callback, false)
-v2rayPoint.configureFileContent = configJson
-v2rayPoint.runLoop(false)
+# Unit testler
+./gradlew testDebugUnitTest
 ```
-
-## Yapılandırma
-
-`app/build.gradle.kts` içindeki `SUBSCRIPTION_URL` placeholder'ını gerçek
-`doc.google.com` endpoint'inle değiştir:
-
-```kotlin
-buildConfigField(
-    "String",
-    "SUBSCRIPTION_URL",
-    "\"https://doc.google.com/document/d/<DOC_ID>/export?format=txt\""
-)
-```
-
-## Test (Aşama 1 — Xray olmadan)
-
-UI ve ping mantığı şu an çalışır durumda:
-1. Android Studio'da projeyi aç
-2. `SUBSCRIPTION_URL`'i ayarla
-3. Çalıştır → "Sunucular alınıyor → Test ediliyor → Liste" akışı görünmeli
-4. BAĞLAN butonu VPN izni isteyecek ama henüz tünel kurmuyor
 
 ## Mimari
 
 ```
-┌─────────────────────────────────────┐
-│  Compose UI (MainActivity)          │
-│        ↓                            │
-│  VpnViewModel (state machine)       │
-└─────────────────────────────────────┘
-        ↓                ↓
-┌──────────────┐  ┌──────────────┐
-│ Subscription │  │ ServerPinger │
-│   Fetcher    │  │  (TCP ping)  │
-└──────────────┘  └──────────────┘
-        ↓
-  ConfigParser → List<ServerConfig>
-        ↓
-  XrayConfigBuilder → Xray JSON
-        ↓
-  XrayVpnService:
+┌─────────────────────────────────────────┐
+│  Compose UI (MainActivity / HomeScreen) │
+│        ↕ StateFlow                      │
+│  VpnViewModel (UiState)                 │
+└─────────────────────────────────────────┘
+     ↓                  ↓            ↑
+┌──────────────┐  ┌──────────────┐  │
+│ Subscription │  │ ServerPinger │  │ VpnStateRepository
+│   Fetcher    │  │  (TCP ping)  │  │ (servis → UI köprüsü)
+└──────────────┘  └──────────────┘  │
+     ↓                              │
+  ConfigParser → List<ServerConfig> │
+     ↓                              │
+  XrayConfigBuilder → Xray JSON     │
+     ↓                              │
+  XrayVpnService ───────────────────┘
     ├── VpnService.Builder → tun fd
-    ├── libXray (Xray-core) → SOCKS :10808
-    └── tun2socks: tun ↔ SOCKS :10808
+    ├── XrayCore (libXray) → SOCKS :10808   ← soyutlama hazır
+    └── tun2socks: tun ↔ SOCKS :10808       ← entegrasyon bekliyor
 ```
 
-## Sonraki konular
+## Çekirdek Entegrasyonu (Aşama 2)
 
-- [ ] libXray.aar entegrasyonu
-- [ ] tun2socks bağlama
-- [ ] Bağlantı testi (gerçek tünel)
-- [ ] Trafik istatistikleri (upload/download)
+Gerçek tünel için üç parça gerekiyor:
+
+### 1. libXray.aar
+
+**A) Hazır AAR (önerilir):**
+`github.com/2dust/AndroidLibXrayLite` releases'ından AAR'ı indir,
+`app/libs/` altına koy — gradle otomatik dahil eder.
+
+**B) Kendin derle:**
+```bash
+git clone https://github.com/xtls/libxray
+cd libxray
+go install golang.org/x/mobile/cmd/gomobile@latest
+gomobile init
+gomobile bind -target=android -androidapi=24 \
+  -o libXray.aar github.com/xtls/libxray
+```
+
+### 2. tun2socks
+
+`hev-socks5-tunnel` (önerilir) `.so` dosyalarını
+`app/src/main/jniLibs/{arm64-v8a,armeabi-v7a,x86_64}/` altına koy.
+
+### 3. Adapter
+
+`service/core/XrayCore.kt` içindeki arayüzü saran bir adapter yaz ve
+`XrayCoreProvider.create()` içinde döndür — servis koduna dokunmak gerekmez:
+
+```kotlin
+class LibXrayCore : XrayCore {
+    override val isAvailable = true
+    override fun start(configJson: String) { Libv2ray.startLoop(configJson) }
+    override fun stop() { Libv2ray.stopLoop() }
+}
+```
+
+## Yol Haritası
+
+- [ ] libXray.aar + tun2socks entegrasyonu (gerçek tünel)
+- [ ] Trafik istatistikleri (upload / download)
 - [ ] Kill switch
-- [ ] Subscription güncelleme zamanlayıcısı
-- [ ] Türkmence/Türkçe çeviri
-- [ ] App icon + splash screen
-- [ ] ProGuard kuralları
-- [ ] Release imzalama
+- [ ] Seçili sunucu ve son liste kalıcılığı (DataStore)
+- [ ] Otomatik abonelik yenileme zamanlayıcısı
+- [ ] Türkmence çeviri (`values-tk`)
+- [ ] Per-app proxy (split tunneling)

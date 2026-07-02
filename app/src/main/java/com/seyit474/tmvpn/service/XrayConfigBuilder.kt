@@ -13,8 +13,8 @@ import org.json.JSONObject
  */
 object XrayConfigBuilder {
 
-    private const val SOCKS_PORT = 10808
-    private const val DNS_PORT = 10853
+    const val SOCKS_PORT = 10808
+    const val DNS_PORT = 10853
 
     fun build(cfg: ServerConfig): String {
         val root = JSONObject().apply {

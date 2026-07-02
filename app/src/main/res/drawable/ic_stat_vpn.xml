@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Bildirim ikonu: şimşek delikli kalkan (alfa maskesi) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M12,2 L20,5.2 V11 C20,15.5 16.9,19 12,21.5 C7.1,19 4,15.5 4,11 V5.2 Z
+            M12.58,6.2 L8.5,12.6 H11.42 L10.25,17.8 L15.5,10.8 H12 Z" />
+</vector>

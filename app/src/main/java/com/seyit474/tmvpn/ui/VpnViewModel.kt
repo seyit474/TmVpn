@@ -5,74 +5,130 @@ import androidx.lifecycle.viewModelScope
 import com.seyit474.tmvpn.BuildConfig
 import com.seyit474.tmvpn.model.ServerConfig
 import com.seyit474.tmvpn.ping.ServerPinger
+import com.seyit474.tmvpn.service.VpnState
+import com.seyit474.tmvpn.service.VpnStateRepository
+import com.seyit474.tmvpn.service.XrayConfigBuilder
 import com.seyit474.tmvpn.subscription.SubscriptionFetcher
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 
 class VpnViewModel(
     private val fetcher: SubscriptionFetcher = SubscriptionFetcher(),
     private val pinger: ServerPinger = ServerPinger()
 ) : ViewModel() {
 
-    sealed interface UiState {
-        data object Idle : UiState
-        data object Loading : UiState              // subscription çekiliyor
-        data object Testing : UiState              // sunucular pingleniyor
-        data class Ready(
-            val results: List<ServerPinger.Result>,
-            val selected: ServerConfig
-        ) : UiState
-        data object Connecting : UiState
-        data class Connected(val server: ServerConfig) : UiState
-        data class Error(val message: String) : UiState
+    enum class RefreshPhase { IDLE, FETCHING, TESTING }
+
+    /** UI'da metne çevrilen, Context gerektirmeyen hata tipleri. */
+    sealed interface UiError {
+        data object MissingUrl : UiError
+        data object NoServers : UiError
+        data object NoReachableServer : UiError
+        data object Network : UiError
+        data object Timeout : UiError
+        data class Http(val code: Int) : UiError
+        data class Unknown(val detail: String) : UiError
     }
 
-    private val _state = MutableStateFlow<UiState>(UiState.Idle)
-    val state: StateFlow<UiState> = _state.asStateFlow()
+    data class UiState(
+        val servers: List<ServerPinger.Result> = emptyList(),
+        val selectedId: String? = null,
+        val refreshPhase: RefreshPhase = RefreshPhase.IDLE,
+        val vpnState: VpnState = VpnState.Idle,
+        val error: UiError? = null
+    ) {
+        val selectedServer: ServerConfig?
+            get() = servers.firstOrNull { it.config.id == selectedId }?.config
+        val isRefreshing: Boolean
+            get() = refreshPhase != RefreshPhase.IDLE
+        val isConnectedOrConnecting: Boolean
+            get() = vpnState is VpnState.Connected || vpnState is VpnState.Connecting
+    }
 
-    fun refreshAndPickFastest() {
+    private val local = MutableStateFlow(UiState())
+
+    val state: StateFlow<UiState> =
+        combine(local, VpnStateRepository.state) { ui, vpn -> ui.copy(vpnState = vpn) }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, UiState())
+
+    init {
+        refresh()
+    }
+
+    /** Aboneliği çeker, tüm sunucuları pingler, en hızlısını seçili yapar. */
+    fun refresh() {
+        if (local.value.refreshPhase != RefreshPhase.IDLE) return
         viewModelScope.launch {
-            _state.value = UiState.Loading
-            val list = fetcher.fetch(BuildConfig.SUBSCRIPTION_URL).getOrElse {
-                _state.value = UiState.Error("Abonelik alınamadı: ${it.message}")
+            local.update { it.copy(refreshPhase = RefreshPhase.FETCHING, error = null) }
+
+            val url = BuildConfig.SUBSCRIPTION_URL
+            if (url.isBlank()) {
+                fail(UiError.MissingUrl)
                 return@launch
             }
-            if (list.isEmpty()) {
-                _state.value = UiState.Error("Sunucu bulunamadı")
+
+            val servers = fetcher.fetch(url).getOrElse {
+                fail(it.toUiError())
                 return@launch
             }
-            _state.value = UiState.Testing
-            val results = pinger.pingAll(list)
-            val fastest = results.firstOrNull { it.isReachable }?.config
-            if (fastest == null) {
-                _state.value = UiState.Error("Hiçbir sunucuya ulaşılamadı")
+            if (servers.isEmpty()) {
+                fail(UiError.NoServers)
                 return@launch
             }
-            _state.value = UiState.Ready(results, fastest)
+
+            local.update { it.copy(refreshPhase = RefreshPhase.TESTING) }
+            val results = pinger.pingAll(servers)
+            val fastest = results.firstOrNull { it.isReachable }
+
+            local.update { cur ->
+                // Kullanıcının önceki seçimi hâlâ listedeyse koru, yoksa en hızlıyı seç
+                val keepSelection = cur.selectedId
+                    ?.takeIf { id -> results.any { it.config.id == id && it.isReachable } }
+                cur.copy(
+                    servers = results,
+                    selectedId = keepSelection ?: fastest?.config?.id,
+                    refreshPhase = RefreshPhase.IDLE,
+                    error = if (fastest == null) UiError.NoReachableServer else null
+                )
+            }
         }
     }
 
     fun selectServer(cfg: ServerConfig) {
-        val cur = _state.value
-        if (cur is UiState.Ready) {
-            _state.value = cur.copy(selected = cfg)
-        }
+        local.update { it.copy(selectedId = cfg.id) }
     }
 
-    fun onConnectClicked() {
-        val cur = _state.value as? UiState.Ready ?: return
-        _state.value = UiState.Connecting
-        // VpnService start çağrısı Activity tarafında yapılır (prepare için)
-        // Bağlantı kurulduğunda dışarıdan markConnected çağrılır
+    fun consumeError() {
+        local.update { it.copy(error = null) }
     }
 
-    fun markConnected(cfg: ServerConfig) {
-        _state.value = UiState.Connected(cfg)
+    /** Seçili sunucu için Xray config JSON'u üretir; Activity servisi başlatır. */
+    fun buildConnectionRequest(): ConnectionRequest? {
+        val server = state.value.selectedServer ?: return null
+        return ConnectionRequest(
+            configJson = XrayConfigBuilder.build(server),
+            serverRemark = server.remark
+        )
     }
 
-    fun markDisconnected() {
-        _state.value = UiState.Idle
+    data class ConnectionRequest(val configJson: String, val serverRemark: String)
+
+    private fun fail(error: UiError) {
+        local.update { it.copy(refreshPhase = RefreshPhase.IDLE, error = error) }
+    }
+
+    private fun Throwable.toUiError(): UiError = when (this) {
+        is UnknownHostException -> UiError.Network
+        is SocketTimeoutException -> UiError.Timeout
+        is SubscriptionFetcher.HttpException -> UiError.Http(code)
+        is java.io.IOException -> UiError.Network
+        else -> UiError.Unknown(message ?: javaClass.simpleName)
     }
 }

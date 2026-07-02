@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Marka renkleri -->
+    <color name="brand_navy">#0F172A</color>
+    <color name="brand_emerald">#10B981</color>
+
+    <!-- Launcher / splash -->
+    <color name="ic_launcher_background">#0F172A</color>
+    <color name="splash_background">#0F172A</color>
+</resources>
