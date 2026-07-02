@@ -60,6 +60,12 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
 
+    // libv2ray.aar varsa gerçek çekirdek adapter'ını (`src/xray`) derle;
+    // yoksa stub'ı (`src/nocore`). Böylece proje çekirdek olmadan da derlenir.
+    // AAR'ı GitHub Actions release'ten indirip app/libs/ altına koyar.
+    val hasXrayCore = file("libs/libv2ray.aar").exists()
+    sourceSets["main"].java.srcDir(if (hasXrayCore) "src/xray/java" else "src/nocore/java")
+
     buildFeatures {
         compose = true
         buildConfig = true

@@ -32,12 +32,26 @@ tabanlı, otomatik en hızlı sunucuyu seçen Android VPN istemcisi.
 | Xray JSON config üretimi | ✅ Hazır |
 | VpnService (tun + bildirim + durum köprüsü) | ✅ Hazır |
 | Unit testler (parser + config builder) | ✅ Hazır |
-| **libXray çekirdeği (gerçek tünel)** | 🚧 Bekliyor |
-| tun2socks entegrasyonu | 🚧 Bekliyor |
+| Xray çekirdeği adapter'ı (libv2ray) + CI'da otomatik AAR indirme | ✅ Hazır |
+| **tun2socks köprüsü (tun ↔ SOCKS)** | 🚧 Bekliyor |
 
-> Çekirdek paketlenmediği sürece uygulama dürüst davranır: BAĞLAN'a
+> tun2socks köprüsü paketlenene kadar uygulama dürüst davranır: BAĞLAN'a
 > basıldığında tünel kurulmaz ve kullanıcıya açık bir hata gösterilir.
-> "Sahte bağlı" durumu asla oluşmaz.
+> "Sahte bağlı" durumu asla oluşmaz. VpnService, hem Xray hem tun2socks
+> hazır olmadan bağlanmayı reddeder.
+
+### Çekirdek entegrasyonu nasıl çalışıyor?
+
+`app/libs/libv2ray.aar` varsa Gradle gerçek adapter'ı (`src/xray`), yoksa
+stub'ı (`src/nocore`) derler — proje her iki durumda da derlenir. GitHub
+Actions, derlemeden önce `scripts/fetch-xray-core.sh` ile AAR'ı
+[AndroidLibXrayLite](https://github.com/2dust/AndroidLibXrayLite)
+release'inden indirir; böylece CI çıktısı gerçek Xray çekirdeğini içerir.
+
+Kalan tek parça, tun arayüzü trafiğini Xray'in SOCKS portuna köprüleyen
+tun2socks (`hev-socks5-tunnel`, `libhevtun.so`). `.so` dosyaları
+`app/src/main/jniLibs/` altına eklenip `Tun2Socks` arayüzü implemente
+edildiğinde tam tünel devreye girer.
 
 ## Derleme
 

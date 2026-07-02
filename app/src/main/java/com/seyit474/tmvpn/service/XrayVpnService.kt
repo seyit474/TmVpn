@@ -25,7 +25,8 @@ import com.seyit474.tmvpn.ui.MainActivity
 class XrayVpnService : VpnService() {
 
     private var tunInterface: ParcelFileDescriptor? = null
-    private val core = XrayCoreProvider.create()
+    private val core = XrayCoreProvider.createXray()
+    private val tun2socks = XrayCoreProvider.createTun2Socks()
 
     companion object {
         private const val CHANNEL_ID = "tmvpn_status"
@@ -83,16 +84,20 @@ class XrayVpnService : VpnService() {
         startForeground(NOTIF_ID, buildNotification(getString(R.string.notif_connecting)))
         VpnStateRepository.update(VpnState.Connecting(remark))
 
-        if (!core.isAvailable) {
+        // Tam tünel için hem Xray çekirdeği hem tun2socks köprüsü gerekli.
+        // İkisi de yoksa bağlanma; sahte "bağlı" durumu oluşmasın.
+        if (!core.isAvailable || !tun2socks.isAvailable) {
             failAndStop(getString(R.string.error_core_missing))
             return
         }
 
-        runCatching { core.start(configJson) }.onFailure {
+        // 1. Xray'i başlat — çekirdeğin dış soketleri protect() ile tünel dışına alınır
+        runCatching { core.start(configJson) { fd -> protect(fd) } }.onFailure {
             failAndStop(it.message ?: getString(R.string.error_unknown, it.javaClass.simpleName))
             return
         }
 
+        // 2. tun arayüzünü kur
         val tun = Builder()
             .setSession(getString(R.string.app_name))
             .addAddress(TUN_ADDRESS, 32)
@@ -108,8 +113,16 @@ class XrayVpnService : VpnService() {
         }
         tunInterface = tun
 
-        // TODO(çekirdek entegrasyonu): tun2socks başlat —
-        // Tun2Socks.start(tun.fd, "127.0.0.1", XrayConfigBuilder.SOCKS_PORT)
+        // 3. tun trafiğini Xray'in SOCKS portuna köprüle
+        runCatching {
+            tun2socks.start(tun.fd, "127.0.0.1", XrayConfigBuilder.SOCKS_PORT, TUN_MTU)
+        }.onFailure {
+            core.stop()
+            tun.close()
+            tunInterface = null
+            failAndStop(it.message ?: getString(R.string.error_unknown, it.javaClass.simpleName))
+            return
+        }
 
         VpnStateRepository.update(VpnState.Connected(remark, SystemClock.elapsedRealtime()))
         notify(getString(R.string.notif_connected, remark))
@@ -123,6 +136,7 @@ class XrayVpnService : VpnService() {
     }
 
     private fun shutdown() {
+        runCatching { tun2socks.stop() }
         core.stop()
         tunInterface?.close()
         tunInterface = null
@@ -132,6 +146,7 @@ class XrayVpnService : VpnService() {
     }
 
     override fun onDestroy() {
+        runCatching { tun2socks.stop() }
         core.stop()
         tunInterface?.close()
         tunInterface = null

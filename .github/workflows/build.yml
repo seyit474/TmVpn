@@ -36,6 +36,9 @@ jobs:
           fi
           chmod +x gradlew
 
+      - name: Fetch Xray core (libv2ray.aar)
+        run: bash scripts/fetch-xray-core.sh
+
       - name: Run Unit Tests
         env:
           SUBSCRIPTION_URL: ${{ secrets.SUBSCRIPTION_URL }}
