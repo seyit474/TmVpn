@@ -7,9 +7,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- usesCleartextTraffic: abonelik adresleri http:// olabilir (Hiddify gibi) -->
     <application
         android:name=".TmVpnApp"
         android:allowBackup="false"
+        android:usesCleartextTraffic="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"

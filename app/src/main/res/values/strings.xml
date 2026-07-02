@@ -38,6 +38,7 @@
     <string name="error_no_servers">Abonelikte sunucu bulunamadı</string>
     <string name="error_no_reachable">Hiçbir sunucuya ulaşılamadı</string>
     <string name="error_network">İnternet bağlantısı yok ya da sunucuya erişilemiyor</string>
+    <string name="error_network_detail">Sunucuya erişilemiyor — %1$s</string>
     <string name="error_timeout">Bağlantı zaman aşımına uğradı</string>
     <string name="error_http">Sunucu hatası (HTTP %1$d)</string>
     <string name="error_unknown">Beklenmeyen hata: %1$s</string>

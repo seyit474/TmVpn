@@ -36,7 +36,8 @@ class VpnViewModel(app: Application) : AndroidViewModel(app) {
         data object InvalidUrl : UiError
         data object NoServers : UiError
         data object NoReachableServer : UiError
-        data object Network : UiError
+        /** [detail] teşhis için altta yatan hatayı taşır (ör. çözülemeyen host adı) */
+        data class Network(val detail: String?) : UiError
         data object Timeout : UiError
         data class Http(val code: Int) : UiError
         data class Unknown(val detail: String) : UiError
@@ -148,10 +149,10 @@ class VpnViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun Throwable.toUiError(): UiError = when (this) {
-        is UnknownHostException -> UiError.Network
+        is UnknownHostException -> UiError.Network("DNS çözülemedi: $message")
         is SocketTimeoutException -> UiError.Timeout
         is SubscriptionFetcher.HttpException -> UiError.Http(code)
-        is java.io.IOException -> UiError.Network
+        is java.io.IOException -> UiError.Network(message ?: javaClass.simpleName)
         else -> UiError.Unknown(message ?: javaClass.simpleName)
     }
 }

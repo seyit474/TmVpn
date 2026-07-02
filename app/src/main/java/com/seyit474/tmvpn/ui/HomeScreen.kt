@@ -449,7 +449,9 @@ private fun errorMessage(error: VpnViewModel.UiError): String = when (error) {
     VpnViewModel.UiError.InvalidUrl -> stringResource(R.string.error_invalid_url)
     VpnViewModel.UiError.NoServers -> stringResource(R.string.error_no_servers)
     VpnViewModel.UiError.NoReachableServer -> stringResource(R.string.error_no_reachable)
-    VpnViewModel.UiError.Network -> stringResource(R.string.error_network)
+    is VpnViewModel.UiError.Network ->
+        error.detail?.let { stringResource(R.string.error_network_detail, it) }
+            ?: stringResource(R.string.error_network)
     VpnViewModel.UiError.Timeout -> stringResource(R.string.error_timeout)
     is VpnViewModel.UiError.Http -> stringResource(R.string.error_http, error.code)
     is VpnViewModel.UiError.Unknown -> stringResource(R.string.error_unknown, error.detail)
