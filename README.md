@@ -10,6 +10,9 @@ tabanlı, otomatik en hızlı sunucuyu seçen Android VPN istemcisi.
 
 - 🔗 **Abonelik tabanlı** — sunucu listesi tek bir URL'den çekilir,
   base64 kodlu ve düz metin subscription formatları desteklenir
+- 📋 **Panodan abonelik ekleme** — Hiddify tarzı: adresi yapıştır,
+  kaydet, liste anında yenilenir (kullanıcı adresi DataStore'da saklanır
+  ve derlemede gömülü adrese göre önceliklidir)
 - ⚡ **Otomatik en hızlı sunucu** — tüm sunuculara paralel TCP handshake
   ölçümü yapılır, en düşük gecikmeli sunucu otomatik seçilir
 - 🛡️ **VLESS REALITY** — pbk / sid / fp / sni / flow (xtls-rprx-vision) dahil

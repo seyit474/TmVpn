@@ -1,8 +1,10 @@
 package com.seyit474.tmvpn.ui
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.seyit474.tmvpn.BuildConfig
+import com.seyit474.tmvpn.data.SettingsStore
 import com.seyit474.tmvpn.model.ServerConfig
 import com.seyit474.tmvpn.ping.ServerPinger
 import com.seyit474.tmvpn.service.VpnState
@@ -13,22 +15,25 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 
-class VpnViewModel(
-    private val fetcher: SubscriptionFetcher = SubscriptionFetcher(),
-    private val pinger: ServerPinger = ServerPinger()
-) : ViewModel() {
+class VpnViewModel(app: Application) : AndroidViewModel(app) {
+
+    private val settings = SettingsStore(app)
+    private val fetcher = SubscriptionFetcher()
+    private val pinger = ServerPinger()
 
     enum class RefreshPhase { IDLE, FETCHING, TESTING }
 
     /** UI'da metne çevrilen, Context gerektirmeyen hata tipleri. */
     sealed interface UiError {
         data object MissingUrl : UiError
+        data object InvalidUrl : UiError
         data object NoServers : UiError
         data object NoReachableServer : UiError
         data object Network : UiError
@@ -42,7 +47,9 @@ class VpnViewModel(
         val selectedId: String? = null,
         val refreshPhase: RefreshPhase = RefreshPhase.IDLE,
         val vpnState: VpnState = VpnState.Idle,
-        val error: UiError? = null
+        val error: UiError? = null,
+        /** Kullanıcının kaydettiği abonelik adresi (dialog ön doldurması için) */
+        val subscriptionUrl: String? = null
     ) {
         val selectedServer: ServerConfig?
             get() = servers.firstOrNull { it.config.id == selectedId }?.config
@@ -55,8 +62,9 @@ class VpnViewModel(
     private val local = MutableStateFlow(UiState())
 
     val state: StateFlow<UiState> =
-        combine(local, VpnStateRepository.state) { ui, vpn -> ui.copy(vpnState = vpn) }
-            .stateIn(viewModelScope, SharingStarted.Eagerly, UiState())
+        combine(local, VpnStateRepository.state, settings.subscriptionUrl) { ui, vpn, url ->
+            ui.copy(vpnState = vpn, subscriptionUrl = url)
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, UiState())
 
     init {
         refresh()
@@ -68,7 +76,9 @@ class VpnViewModel(
         viewModelScope.launch {
             local.update { it.copy(refreshPhase = RefreshPhase.FETCHING, error = null) }
 
-            val url = BuildConfig.SUBSCRIPTION_URL
+            // Kullanıcının kaydettiği adres öncelikli; yoksa derlemede gömülen
+            val url = settings.subscriptionUrl.first()?.takeIf { it.isNotBlank() }
+                ?: BuildConfig.SUBSCRIPTION_URL
             if (url.isBlank()) {
                 fail(UiError.MissingUrl)
                 return@launch
@@ -98,6 +108,19 @@ class VpnViewModel(
                     error = if (fastest == null) UiError.NoReachableServer else null
                 )
             }
+        }
+    }
+
+    /** Kullanıcının girdiği/yapıştırdığı abonelik adresini kaydeder ve listeyi yeniler. */
+    fun saveSubscriptionUrl(raw: String) {
+        val url = raw.trim()
+        if (!url.startsWith("http://", true) && !url.startsWith("https://", true)) {
+            local.update { it.copy(error = UiError.InvalidUrl) }
+            return
+        }
+        viewModelScope.launch {
+            settings.setSubscriptionUrl(url)
+            refresh()
         }
     }
 

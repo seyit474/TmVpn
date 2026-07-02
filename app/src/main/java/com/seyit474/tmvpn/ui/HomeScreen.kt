@@ -25,27 +25,36 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AddLink
+import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
@@ -70,9 +79,22 @@ fun HomeScreen(
     onRefresh: () -> Unit,
     onSelectServer: (ServerConfig) -> Unit,
     onToggleConnection: () -> Unit,
-    onErrorConsumed: () -> Unit
+    onErrorConsumed: () -> Unit,
+    onSaveSubscription: (String) -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    var showSubscriptionDialog by remember { mutableStateOf(false) }
+
+    if (showSubscriptionDialog) {
+        SubscriptionDialog(
+            initialUrl = state.subscriptionUrl.orEmpty(),
+            onSave = {
+                showSubscriptionDialog = false
+                onSaveSubscription(it)
+            },
+            onDismiss = { showSubscriptionDialog = false }
+        )
+    }
 
     state.error?.let { error ->
         val message = errorMessage(error)
@@ -108,6 +130,12 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showSubscriptionDialog = true }) {
+                        Icon(
+                            Icons.Rounded.AddLink,
+                            contentDescription = stringResource(R.string.action_add_subscription)
+                        )
+                    }
                     RefreshAction(
                         isRefreshing = state.isRefreshing,
                         enabled = !state.isRefreshing && !state.isConnectedOrConnecting,
@@ -151,9 +179,92 @@ fun HomeScreen(
                     selectionEnabled = !state.isConnectedOrConnecting,
                     onSelect = onSelectServer
                 )
+            } else if (!state.isRefreshing) {
+                EmptyState(onAddSubscription = { showSubscriptionDialog = true })
             }
         }
     }
+}
+
+@Composable
+private fun EmptyState(onAddSubscription: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Spacer(Modifier.height(16.dp))
+        Text(
+            stringResource(R.string.empty_no_servers),
+            fontWeight = FontWeight.SemiBold
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            stringResource(R.string.empty_add_subscription_hint),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 13.sp
+        )
+        Spacer(Modifier.height(16.dp))
+        Button(onClick = onAddSubscription) {
+            Icon(Icons.Rounded.AddLink, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.action_add_subscription))
+        }
+    }
+}
+
+/** Hiddify tarzı abonelik ekleme: elle yaz ya da tek dokunuşla panodan yapıştır. */
+@Composable
+private fun SubscriptionDialog(
+    initialUrl: String,
+    onSave: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var url by remember { mutableStateOf(initialUrl) }
+    val clipboard = LocalClipboardManager.current
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.subscription_dialog_title)) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it },
+                    placeholder = { Text(stringResource(R.string.subscription_url_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            clipboard.getText()?.text?.let { url = it.trim() }
+                        }) {
+                            Icon(
+                                Icons.Rounded.ContentPaste,
+                                contentDescription = stringResource(R.string.action_paste)
+                            )
+                        }
+                    }
+                )
+                Spacer(Modifier.height(8.dp))
+                TextButton(onClick = {
+                    clipboard.getText()?.text?.let { url = it.trim() }
+                }) {
+                    Icon(
+                        Icons.Rounded.ContentPaste,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.action_paste))
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSave(url) },
+                enabled = url.isNotBlank()
+            ) { Text(stringResource(R.string.action_save)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        }
+    )
 }
 
 @Composable
@@ -335,6 +446,7 @@ private fun statusLabel(state: VpnViewModel.UiState): String = when (val vpn = s
 @Composable
 private fun errorMessage(error: VpnViewModel.UiError): String = when (error) {
     VpnViewModel.UiError.MissingUrl -> stringResource(R.string.error_missing_url)
+    VpnViewModel.UiError.InvalidUrl -> stringResource(R.string.error_invalid_url)
     VpnViewModel.UiError.NoServers -> stringResource(R.string.error_no_servers)
     VpnViewModel.UiError.NoReachableServer -> stringResource(R.string.error_no_reachable)
     VpnViewModel.UiError.Network -> stringResource(R.string.error_network)

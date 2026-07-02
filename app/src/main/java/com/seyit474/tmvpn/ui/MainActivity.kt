@@ -49,7 +49,8 @@ class MainActivity : ComponentActivity() {
                         onRefresh = vm::refresh,
                         onSelectServer = vm::selectServer,
                         onToggleConnection = ::toggleConnection,
-                        onErrorConsumed = vm::consumeError
+                        onErrorConsumed = vm::consumeError,
+                        onSaveSubscription = vm::saveSubscriptionUrl
                     )
                 }
             }

@@ -17,13 +17,24 @@
     <string name="status_connected">Bağlı · %1$s</string>
     <string name="status_no_selection">Sunucu seçilmedi</string>
 
+    <!-- Abonelik -->
+    <string name="action_add_subscription">Abonelik ekle</string>
+    <string name="subscription_dialog_title">Abonelik adresi</string>
+    <string name="subscription_url_hint">https://…</string>
+    <string name="action_paste">Panodan yapıştır</string>
+    <string name="action_save">Kaydet</string>
+    <string name="action_cancel">Vazgeç</string>
+    <string name="empty_no_servers">Henüz sunucu yok</string>
+    <string name="empty_add_subscription_hint">Başlamak için abonelik adresini yapıştır</string>
+
     <!-- Sunucu listesi -->
     <string name="servers_header">Sunucular (%1$d)</string>
     <string name="latency_ms">%1$d ms</string>
     <string name="latency_unreachable">—</string>
 
     <!-- Hatalar -->
-    <string name="error_missing_url">Abonelik adresi yapılandırılmamış (SUBSCRIPTION_URL)</string>
+    <string name="error_missing_url">Abonelik adresi yok — sağ üstten ekleyebilirsin</string>
+    <string name="error_invalid_url">Geçersiz adres — http:// ya da https:// ile başlamalı</string>
     <string name="error_no_servers">Abonelikte sunucu bulunamadı</string>
     <string name="error_no_reachable">Hiçbir sunucuya ulaşılamadı</string>
     <string name="error_network">İnternet bağlantısı yok ya da sunucuya erişilemiyor</string>
